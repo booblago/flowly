@@ -13,6 +13,7 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
   const [verifyUrl, setVerifyUrl] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
 
@@ -32,6 +33,7 @@ export default function RegisterPage() {
       return;
     }
     setDone(true);
+    setNeedsVerification(Boolean(data.needsVerification));
     setEmailSent(Boolean(data.emailSent));
     setVerifyUrl(data.verifyUrl || null);
   }
@@ -45,14 +47,16 @@ export default function RegisterPage() {
             <span className="neon-pink">ly</span>
           </Link>
           <h1 className="mt-6 font-display text-3xl font-bold">
-            {t("checkYourEmail")}
+            {needsVerification ? t("checkYourEmail") : t("accountReady")}
           </h1>
           <p className="mt-2 text-sm text-muted">
-            {emailSent
-              ? t("verifyEmailSent").replace("{email}", email)
-              : t("verifyEmailManual")}
+            {needsVerification
+              ? emailSent
+                ? t("verifyEmailSent").replace("{email}", email)
+                : t("verifyEmailManual")
+              : t("accountReadyHint")}
           </p>
-          {verifyUrl && (
+          {needsVerification && verifyUrl && (
             <a
               href={verifyUrl}
               className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-white py-3 text-sm font-bold text-black"
@@ -62,7 +66,11 @@ export default function RegisterPage() {
           )}
           <Link
             href="/login"
-            className="mt-4 block text-center text-sm text-brand hover:underline"
+            className={`mt-4 block text-center text-sm font-semibold ${
+              needsVerification
+                ? "text-brand hover:underline"
+                : "rounded-full bg-brand py-3 text-black hover:opacity-90"
+            }`}
           >
             {t("backToLogin")}
           </Link>

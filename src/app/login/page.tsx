@@ -32,6 +32,7 @@ function LoginForm() {
       setLoading(false);
       if (pre.status === 429) setError(preData.error || t("rateLimited"));
       else if (preData.error === "EMAIL_NOT_VERIFIED") setError(t("emailNotVerified"));
+      else if (preData.error === "ACCOUNT_MISSING") setError(t("accountMissing"));
       else setError(t("invalidCreds"));
       return;
     }

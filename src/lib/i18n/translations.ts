@@ -103,6 +103,8 @@ export const messages = {
     signIn: "Sign in",
     signingIn: "Signing in…",
     invalidCreds: "Invalid email or password",
+    accountMissing:
+      "This account is gone (server data was reset). Register again with the same email.",
     noAccount: "No account?",
     register: "Register",
     createWorkspace: "Create workspace",
@@ -376,6 +378,8 @@ export const messages = {
       "Upgrade when Free limits block real delivery work — more boards, multi-step automations, SLA, recurring cards, and client-ready reports.",
     close: "Close",
     checkYourEmail: "Check your email",
+    accountReady: "Account ready",
+    accountReadyHint: "You can log in now with your email and password.",
     verifyEmailSent: "We sent a verification link to {email}. Open it to activate your account.",
     verifyEmailManual:
       "Confirm your email with the button below (email provider not configured yet).",
@@ -525,6 +529,8 @@ export const messages = {
     signIn: "Увійти",
     signingIn: "Вхід…",
     invalidCreds: "Невірний email або пароль",
+    accountMissing:
+      "Цей акаунт зник (дані на сервері скинулись). Зареєструйтесь знову з тим самим email.",
     noAccount: "Немає акаунта?",
     register: "Реєстрація",
     createWorkspace: "Створити workspace",
@@ -797,6 +803,8 @@ export const messages = {
       "Переходьте на Pro, коли Free вже обмежує роботу: більше дощок, багатокрокові автоматизації, SLA, recurring і звіти для клієнта.",
     close: "Закрити",
     checkYourEmail: "Перевірте пошту",
+    accountReady: "Акаунт готовий",
+    accountReadyHint: "Тепер можна увійти з email і паролем.",
     verifyEmailSent: "Ми надіслали посилання на {email}. Відкрийте його, щоб активувати акаунт.",
     verifyEmailManual:
       "Підтвердіть email кнопкою нижче (поштовий сервіс ще не налаштовано).",
@@ -945,6 +953,8 @@ export const messages = {
     signIn: "Anmelden",
     signingIn: "Anmeldung…",
     invalidCreds: "Ungültige E-Mail oder Passwort",
+    accountMissing:
+      "Dieses Konto fehlt (Serverdaten wurden zurückgesetzt). Registriere dich erneut mit derselben E-Mail.",
     noAccount: "Kein Konto?",
     register: "Registrieren",
     createWorkspace: "Workspace erstellen",
@@ -1217,6 +1227,8 @@ export const messages = {
       "Upgrade, wenn Free limitiert: mehr Boards, Multi-Step-Automationen, SLA, Recurring und Client-Reports.",
     close: "Schließen",
     checkYourEmail: "E-Mail prüfen",
+    accountReady: "Konto bereit",
+    accountReadyHint: "Du kannst dich jetzt mit E-Mail und Passwort anmelden.",
     verifyEmailSent: "Wir haben einen Link an {email} gesendet. Öffne ihn zur Aktivierung.",
     verifyEmailManual:
       "Bestätige deine E-Mail über den Button (kein Mail-Provider konfiguriert).",
@@ -1366,6 +1378,8 @@ export const messages = {
     signIn: "Se connecter",
     signingIn: "Connexion…",
     invalidCreds: "E-mail ou mot de passe invalide",
+    accountMissing:
+      "Ce compte a disparu (données serveur réinitialisées). Réinscrivez-vous avec le même e-mail.",
     noAccount: "Pas de compte ?",
     register: "S’inscrire",
     createWorkspace: "Créer un workspace",
@@ -1638,6 +1652,8 @@ export const messages = {
       "Passez en Pro quand Free bloque : plus de boards, automations multi-étapes, SLA, récurrence et rapports client.",
     close: "Fermer",
     checkYourEmail: "Vérifiez votre e-mail",
+    accountReady: "Compte prêt",
+    accountReadyHint: "Vous pouvez vous connecter avec e-mail et mot de passe.",
     verifyEmailSent: "Un lien a été envoyé à {email}. Ouvrez-le pour activer le compte.",
     verifyEmailManual:
       "Confirmez l’e-mail via le bouton ci-dessous (pas de fournisseur e-mail).",

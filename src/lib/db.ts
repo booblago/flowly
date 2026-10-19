@@ -15,6 +15,12 @@ import type {
   Workspace,
 } from "./types";
 import { isProTrigger, planLimits, type PlanId } from "./plans";
+import {
+  emailVerificationRequired,
+  isOwnerEmail,
+  ownerBootstrapPassword,
+  ownerEmails,
+} from "./owner";
 import { LIST_ACCENTS, uid } from "./utils";
 import {
   dbFilePath,
@@ -218,11 +224,14 @@ function findDoneList(db: Database, boardId: string) {
 async function ensureDb(): Promise<Database> {
   if (await sqliteHasUsers()) {
     const data = migrate(await loadFromSqlite());
+    let dirty = false;
     const demo = data.users.find((u) => u.email === "demo@flowly.app");
     if (demo && demo.plan !== "pro") {
       demo.plan = "pro";
-      await saveToSqlite(data);
+      dirty = true;
     }
+    if (await ensureOwnerAccounts(data)) dirty = true;
+    if (dirty) await saveToSqlite(data);
     return data;
   }
 
@@ -231,14 +240,17 @@ async function ensureDb(): Promise<Database> {
     const migrated = migrate(legacy);
     if (!migrated.automations?.length && migrated.boards.some((b) => b.id === "brd_product")) {
       const seeded = await buildSeed();
+      await ensureOwnerAccounts(seeded);
       await saveToSqlite(seeded);
       return seeded;
     }
+    await ensureOwnerAccounts(migrated);
     await saveToSqlite(migrated);
     return migrated;
   }
 
   const seeded = await buildSeed();
+  await ensureOwnerAccounts(seeded);
   await saveToSqlite(seeded);
   return seeded;
 }
@@ -292,24 +304,32 @@ export async function createUser(input: {
   if (existing) throw new Error("Email already registered");
 
   const colors = ["#22d3ee", "#f472b6", "#a3e635", "#fbbf24", "#a78bfa"];
-  const verifyToken = uid("verify").replace(/^verify_/, "") + uid("t");
+  const email = input.email.toLowerCase();
+  const skipVerify =
+    !emailVerificationRequired() || isOwnerEmail(email) || email.endsWith("@flowly.app");
+  const verifyToken = skipVerify
+    ? null
+    : uid("verify").replace(/^verify_/, "") + uid("t");
+  const now = new Date().toISOString();
   const user: User = {
     id: uid("usr"),
     name: input.name,
-    email: input.email.toLowerCase(),
+    email,
     passwordHash: await bcrypt.hash(input.password, 10),
     avatarColor: colors[Math.floor(Math.random() * colors.length)],
     avatarUrl: null,
     bio: "",
     company: "",
-    plan: "free",
+    plan: isOwnerEmail(email) ? "pro" : "free",
     stripeCustomerId: null,
     stripeSubscriptionId: null,
     stripeSubscriptionStatus: null,
-    emailVerifiedAt: null,
+    emailVerifiedAt: skipVerify ? now : null,
     emailVerifyToken: verifyToken,
-    emailVerifyExpires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
+    emailVerifyExpires: skipVerify
+      ? null
+      : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: now,
   };
 
   await updateDb((db) => {
@@ -325,7 +345,90 @@ export async function createUser(input: {
     db.workspaces.push(workspace);
   });
 
-  return { user: toPublicUser(user), verifyToken };
+  return {
+    user: toPublicUser(user),
+    verifyToken: verifyToken ?? "",
+    needsVerification: !skipVerify,
+  };
+}
+
+/** Recreate OWNER_EMAIL after ephemeral Vercel DB wipes so login keeps working. */
+async function ensureOwnerAccounts(db: Database): Promise<boolean> {
+  const password = ownerBootstrapPassword();
+  const emails = ownerEmails();
+  if (!emails.length) return false;
+
+  let dirty = false;
+  const now = new Date().toISOString();
+  const forceReset = process.env.OWNER_RESET_PASSWORD === "1";
+
+  for (const email of emails) {
+    let user = db.users.find((u) => u.email.toLowerCase() === email);
+    if (!user) {
+      if (!password) continue;
+      const passwordHash = await bcrypt.hash(password, 10);
+      user = {
+        id: uid("usr"),
+        name: email.split("@")[0] || "Owner",
+        email,
+        passwordHash,
+        avatarColor: "#a78bfa",
+        avatarUrl: null,
+        bio: "",
+        company: "",
+        plan: "pro",
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        stripeSubscriptionStatus: null,
+        emailVerifiedAt: now,
+        emailVerifyToken: null,
+        emailVerifyExpires: null,
+        createdAt: now,
+      };
+      db.users.push(user);
+      db.workspaces.push({
+        id: uid("ws"),
+        name: "Owner Workspace",
+        description: "Personal workspace",
+        ownerId: user.id,
+        memberIds: [user.id],
+        createdAt: now,
+      });
+      dirty = true;
+      continue;
+    }
+
+    if (user.plan !== "pro") {
+      user.plan = "pro";
+      dirty = true;
+    }
+    if (!user.emailVerifiedAt) {
+      user.emailVerifiedAt = now;
+      user.emailVerifyToken = null;
+      user.emailVerifyExpires = null;
+      dirty = true;
+    }
+    if (forceReset && password) {
+      user.passwordHash = await bcrypt.hash(password, 10);
+      dirty = true;
+    }
+    const hasWorkspace = db.workspaces.some(
+      (w) => w.ownerId === user!.id || w.memberIds.includes(user!.id),
+    );
+    if (!hasWorkspace) {
+      db.workspaces.push({
+        id: uid("ws"),
+        name: "Owner Workspace",
+        description: "Personal workspace",
+        ownerId: user.id,
+        memberIds: [user.id],
+        createdAt: now,
+      });
+      dirty = true;
+    }
+  }
+
+  return dirty;
 }
 
 export async function verifyEmailToken(token: string) {

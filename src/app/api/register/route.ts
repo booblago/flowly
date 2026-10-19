@@ -35,11 +35,19 @@ export async function POST(req: Request) {
       );
     }
 
-    const { user, verifyToken } = await createUser({
+    const { user, verifyToken, needsVerification } = await createUser({
       name: body.name.trim(),
       email,
       password: body.password,
     });
+
+    if (!needsVerification) {
+      return NextResponse.json({
+        user,
+        needsVerification: false,
+        emailSent: false,
+      });
+    }
 
     const mail = await sendVerificationEmail({
       to: email,

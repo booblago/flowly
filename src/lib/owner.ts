@@ -16,3 +16,13 @@ export function isOwnerEmail(email?: string | null) {
   if (owners.length === 0) return false;
   return owners.includes(email.toLowerCase());
 }
+
+/** Password used to recreate the owner after ephemeral DB resets on Vercel. */
+export function ownerBootstrapPassword() {
+  return (process.env.OWNER_PASSWORD || "").trim() || null;
+}
+
+/** Require inbox verification only when Resend is configured. */
+export function emailVerificationRequired() {
+  return Boolean(process.env.RESEND_API_KEY?.trim());
+}
