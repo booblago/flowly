@@ -52,3 +52,5 @@ data/private/
 
 # Keep folder placeholder only
 !data/.gitkeep
+
+.vercel

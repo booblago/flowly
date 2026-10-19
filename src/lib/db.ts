@@ -313,6 +313,65 @@ export async function createUser(input: {
   return toPublicUser(user);
 }
 
+/**
+ * After Vercel cold starts the memory DB is empty while the JWT session remains.
+ * Recreate the signed-in user + personal workspace so the UI keeps working.
+ */
+export async function ensureSessionUser(input: {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+}) {
+  if (!input.email) return null;
+  const email = input.email.toLowerCase();
+  const colors = ["#22d3ee", "#f472b6", "#a3e635", "#fbbf24", "#a78bfa"];
+
+  await updateDb((db) => {
+    let user =
+      db.users.find((u) => u.id === input.id) ??
+      db.users.find((u) => u.email.toLowerCase() === email);
+
+    if (!user) {
+      user = {
+        id: input.id,
+        name: (input.name || email.split("@")[0] || "User").trim(),
+        email,
+        passwordHash: "",
+        avatarColor: colors[Math.floor(Math.random() * colors.length)],
+        avatarUrl: null,
+        bio: "",
+        company: "",
+        plan: "free",
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        stripeSubscriptionStatus: null,
+        createdAt: new Date().toISOString(),
+      };
+      db.users.push(user);
+    } else if (user.id !== input.id) {
+      // Keep session id stable for membership checks.
+      user.id = input.id;
+    }
+
+    const hasWorkspace = db.workspaces.some(
+      (w) => w.ownerId === input.id || w.memberIds.includes(input.id),
+    );
+    if (!hasWorkspace) {
+      db.workspaces.push({
+        id: uid("ws"),
+        name: `${user.name.split(" ")[0]}'s Workspace`,
+        description: "Personal workspace",
+        ownerId: input.id,
+        memberIds: [input.id],
+        createdAt: new Date().toISOString(),
+      });
+    }
+  });
+
+  const workspaces = await getWorkspacesForUser(input.id);
+  return workspaces[0] ?? null;
+}
+
 export async function verifyPassword(user: User, password: string) {
   return bcrypt.compare(password, user.passwordHash);
 }
