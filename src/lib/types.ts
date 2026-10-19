@@ -51,6 +51,9 @@ export interface User {
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
   stripeSubscriptionStatus?: string | null;
+  emailVerifiedAt?: string | null;
+  emailVerifyToken?: string | null;
+  emailVerifyExpires?: string | null;
   createdAt: string;
 }
 
@@ -187,4 +190,7 @@ export interface Database {
   automations: AutomationRule[];
 }
 
-export type PublicUser = Omit<User, "passwordHash">;
+export type PublicUser = Omit<
+  User,
+  "passwordHash" | "emailVerifyToken" | "emailVerifyExpires"
+>;

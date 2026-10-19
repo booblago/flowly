@@ -3,11 +3,14 @@ import Credentials from "next-auth/providers/credentials";
 import {
   findUserByEmail,
   findUserById,
+  isEmailVerified,
   toPublicUser,
   userImage,
   verifyPassword,
 } from "./db";
+import { normalizeEmail } from "./email";
 import { isOwnerEmail } from "./owner";
+import { rateLimit } from "./rate-limit";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -18,13 +21,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const email = String(credentials?.email ?? "");
+        const email = normalizeEmail(String(credentials?.email ?? ""));
         const password = String(credentials?.password ?? "");
         if (!email || !password) return null;
+
+        const limited = rateLimit(`login:${email}`, 10, 15 * 60 * 1000);
+        if (!limited.ok) {
+          throw new Error(`Too many login attempts. Try again in ${limited.retryAfterSec}s.`);
+        }
+
         const user = await findUserByEmail(email);
         if (!user) return null;
         const ok = await verifyPassword(user, password);
         if (!ok) return null;
+        if (!isEmailVerified(user)) {
+          throw new Error("EMAIL_NOT_VERIFIED");
+        }
         const pub = toPublicUser(user);
         return {
           id: pub.id,

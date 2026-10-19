@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS users (
   stripe_customer_id TEXT,
   stripe_subscription_id TEXT,
   stripe_subscription_status TEXT,
+  email_verified_at TEXT,
+  email_verify_token TEXT,
+  email_verify_expires TEXT,
   created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS workspaces (
@@ -142,6 +145,14 @@ function migrateSchema(database: Database.Database) {
     "users",
     "stripe_subscription_status",
     "stripe_subscription_status TEXT",
+  );
+  addColIfMissing(database, "users", "email_verified_at", "email_verified_at TEXT");
+  addColIfMissing(database, "users", "email_verify_token", "email_verify_token TEXT");
+  addColIfMissing(
+    database,
+    "users",
+    "email_verify_expires",
+    "email_verify_expires TEXT",
   );
   addColIfMissing(database, "boards", "share_token", "share_token TEXT");
   addColIfMissing(database, "cards", "completed_at", "completed_at TEXT");

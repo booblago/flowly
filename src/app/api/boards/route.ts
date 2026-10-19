@@ -7,6 +7,7 @@ import {
   getBoardsForUser,
   getWorkspacesForUser,
 } from "@/lib/db";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 export async function GET() {
   const session = await auth();
@@ -35,6 +36,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
+    const limited = rateLimit(
+      `boards-create:${session.user.id}:${clientIp(req)}`,
+      20,
+      60 * 60 * 1000,
+    );
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: `Too many boards created. Try again in ${limited.retryAfterSec}s.` },
+        { status: 429 },
+      );
+    }
     // On Vercel memory DB, never trust a workspaceId from another serverless
     // instance — always ensure this request's user + workspace locally.
     await ensureSessionUser({

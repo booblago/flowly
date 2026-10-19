@@ -22,6 +22,19 @@ function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    const pre = await fetch("/api/login-precheck", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const preData = await pre.json();
+    if (!pre.ok) {
+      setLoading(false);
+      if (pre.status === 429) setError(preData.error || t("rateLimited"));
+      else if (preData.error === "EMAIL_NOT_VERIFIED") setError(t("emailNotVerified"));
+      else setError(t("invalidCreds"));
+      return;
+    }
     const res = await signIn("credentials", {
       email,
       password,

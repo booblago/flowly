@@ -13,6 +13,9 @@ export const users = sqliteTable("users", {
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   stripeSubscriptionStatus: text("stripe_subscription_status"),
+  emailVerifiedAt: text("email_verified_at"),
+  emailVerifyToken: text("email_verify_token"),
+  emailVerifyExpires: text("email_verify_expires"),
   createdAt: text("created_at").notNull(),
 });
 

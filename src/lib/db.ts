@@ -43,6 +43,12 @@ function migrate(db: Database): Database {
     stripeCustomerId: u.stripeCustomerId ?? null,
     stripeSubscriptionId: u.stripeSubscriptionId ?? null,
     stripeSubscriptionStatus: u.stripeSubscriptionStatus ?? null,
+    // Legacy / demo accounts count as verified
+    emailVerifiedAt:
+      u.emailVerifiedAt ??
+      (u.email.endsWith("@flowly.app") ? u.createdAt : null),
+    emailVerifyToken: u.emailVerifyToken ?? null,
+    emailVerifyExpires: u.emailVerifyExpires ?? null,
   }));
   db.boards = db.boards.map((b) => ({
     ...b,
@@ -258,7 +264,12 @@ export function getDatabasePath() {
 }
 
 export function toPublicUser(user: User): PublicUser {
-  const { passwordHash: _, ...rest } = user;
+  const {
+    passwordHash: _p,
+    emailVerifyToken: _t,
+    emailVerifyExpires: _e,
+    ...rest
+  } = user;
   return rest;
 }
 
@@ -281,6 +292,7 @@ export async function createUser(input: {
   if (existing) throw new Error("Email already registered");
 
   const colors = ["#22d3ee", "#f472b6", "#a3e635", "#fbbf24", "#a78bfa"];
+  const verifyToken = uid("verify").replace(/^verify_/, "") + uid("t");
   const user: User = {
     id: uid("usr"),
     name: input.name,
@@ -294,6 +306,9 @@ export async function createUser(input: {
     stripeCustomerId: null,
     stripeSubscriptionId: null,
     stripeSubscriptionStatus: null,
+    emailVerifiedAt: null,
+    emailVerifyToken: verifyToken,
+    emailVerifyExpires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
   };
 
@@ -310,7 +325,30 @@ export async function createUser(input: {
     db.workspaces.push(workspace);
   });
 
-  return toPublicUser(user);
+  return { user: toPublicUser(user), verifyToken };
+}
+
+export async function verifyEmailToken(token: string) {
+  let verifiedEmail: string | null = null;
+  await updateDb((db) => {
+    const user = db.users.find((u) => u.emailVerifyToken === token);
+    if (!user) throw new Error("Invalid or expired verification link");
+    if (
+      user.emailVerifyExpires &&
+      new Date(user.emailVerifyExpires).getTime() < Date.now()
+    ) {
+      throw new Error("Verification link expired — register again or request a new link");
+    }
+    user.emailVerifiedAt = new Date().toISOString();
+    user.emailVerifyToken = null;
+    user.emailVerifyExpires = null;
+    verifiedEmail = user.email;
+  });
+  return verifiedEmail;
+}
+
+export function isEmailVerified(user: User) {
+  return Boolean(user.emailVerifiedAt);
 }
 
 /**
@@ -345,6 +383,9 @@ export async function ensureSessionUser(input: {
         stripeCustomerId: null,
         stripeSubscriptionId: null,
         stripeSubscriptionStatus: null,
+        emailVerifiedAt: new Date().toISOString(),
+        emailVerifyToken: null,
+        emailVerifyExpires: null,
         createdAt: new Date().toISOString(),
       };
       db.users.push(user);
@@ -1462,6 +1503,7 @@ export async function getSmartInbox(userId: string) {
 
 async function buildSeed(): Promise<Database> {
   const passwordHash = await bcrypt.hash("demo1234", 10);
+  const now = new Date().toISOString();
   const demo: User = {
     id: "usr_demo",
     name: "Alex Rivera",
@@ -1469,7 +1511,8 @@ async function buildSeed(): Promise<Database> {
     passwordHash,
     avatarColor: "#22d3ee",
     plan: "pro",
-    createdAt: new Date().toISOString(),
+    emailVerifiedAt: now,
+    createdAt: now,
   };
   const teammate: User = {
     id: "usr_sam",
@@ -1478,7 +1521,8 @@ async function buildSeed(): Promise<Database> {
     passwordHash,
     avatarColor: "#f472b6",
     plan: "free",
-    createdAt: new Date().toISOString(),
+    emailVerifiedAt: now,
+    createdAt: now,
   };
   const designer: User = {
     id: "usr_mia",
@@ -1487,7 +1531,8 @@ async function buildSeed(): Promise<Database> {
     passwordHash,
     avatarColor: "#a3e635",
     plan: "free",
-    createdAt: new Date().toISOString(),
+    emailVerifiedAt: now,
+    createdAt: now,
   };
 
   const workspace: Workspace = {

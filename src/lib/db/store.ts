@@ -58,6 +58,9 @@ export function loadFromSqlite(): AppDatabase {
       stripeCustomerId: r.stripeCustomerId ?? null,
       stripeSubscriptionId: r.stripeSubscriptionId ?? null,
       stripeSubscriptionStatus: r.stripeSubscriptionStatus ?? null,
+      emailVerifiedAt: r.emailVerifiedAt ?? null,
+      emailVerifyToken: r.emailVerifyToken ?? null,
+      emailVerifyExpires: r.emailVerifyExpires ?? null,
       createdAt: r.createdAt,
     }),
   );
@@ -213,6 +216,9 @@ export function saveToSqlite(data: AppDatabase) {
             stripeCustomerId: u.stripeCustomerId ?? null,
             stripeSubscriptionId: u.stripeSubscriptionId ?? null,
             stripeSubscriptionStatus: u.stripeSubscriptionStatus ?? null,
+            emailVerifiedAt: u.emailVerifiedAt ?? null,
+            emailVerifyToken: u.emailVerifyToken ?? null,
+            emailVerifyExpires: u.emailVerifyExpires ?? null,
             createdAt: u.createdAt,
           })),
         )
