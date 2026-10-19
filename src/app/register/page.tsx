@@ -29,7 +29,11 @@ export default function RegisterPage() {
     const data = await res.json();
     setLoading(false);
     if (!res.ok) {
-      setError(data.error || t("registerFailed"));
+      setError(
+        data.code === "EMAIL_TAKEN" || data.error === "Email already registered"
+          ? t("emailTaken")
+          : data.error || t("registerFailed"),
+      );
       return;
     }
     setDone(true);

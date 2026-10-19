@@ -300,22 +300,66 @@ export async function createUser(input: {
   email: string;
   password: string;
 }) {
-  const existing = await findUserByEmail(input.email);
-  if (existing) throw new Error("Email already registered");
-
   const colors = ["#22d3ee", "#f472b6", "#a3e635", "#fbbf24", "#a78bfa"];
   const email = input.email.toLowerCase();
   const skipVerify =
     !emailVerificationRequired() || isOwnerEmail(email) || email.endsWith("@flowly.app");
+  const now = new Date().toISOString();
+  const passwordHash = await bcrypt.hash(input.password, 10);
+
+  // After Vercel DB wipes, an orphan account can block register while login fails
+  // (empty/unknown hash). In sandbox (no Resend) reclaim the email + set password.
+  const existing = await findUserByEmail(email);
+  if (existing) {
+    const canReclaim =
+      !emailVerificationRequired() ||
+      !existing.passwordHash ||
+      isOwnerEmail(email);
+    if (!canReclaim) {
+      throw new Error("Email already registered");
+    }
+
+    let publicUser: PublicUser | null = null;
+    await updateDb((db) => {
+      const user = db.users.find((u) => u.email.toLowerCase() === email);
+      if (!user) throw new Error("Email already registered");
+      user.name = input.name.trim() || user.name;
+      user.passwordHash = passwordHash;
+      user.emailVerifiedAt = now;
+      user.emailVerifyToken = null;
+      user.emailVerifyExpires = null;
+      if (isOwnerEmail(email)) user.plan = "pro";
+      const hasWorkspace = db.workspaces.some(
+        (w) => w.ownerId === user.id || w.memberIds.includes(user.id),
+      );
+      if (!hasWorkspace) {
+        db.workspaces.push({
+          id: uid("ws"),
+          name: `${user.name.split(" ")[0]}'s Workspace`,
+          description: "Personal workspace",
+          ownerId: user.id,
+          memberIds: [user.id],
+          createdAt: now,
+        });
+      }
+      publicUser = toPublicUser(user);
+    });
+
+    return {
+      user: publicUser!,
+      verifyToken: "",
+      needsVerification: false,
+    };
+  }
+
   const verifyToken = skipVerify
     ? null
     : uid("verify").replace(/^verify_/, "") + uid("t");
-  const now = new Date().toISOString();
   const user: User = {
     id: uid("usr"),
     name: input.name,
     email,
-    passwordHash: await bcrypt.hash(input.password, 10),
+    passwordHash,
     avatarColor: colors[Math.floor(Math.random() * colors.length)],
     avatarUrl: null,
     bio: "",

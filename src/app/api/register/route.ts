@@ -64,6 +64,12 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Registration failed";
+    if (message === "Email already registered") {
+      return NextResponse.json(
+        { error: "Email already registered", code: "EMAIL_TAKEN" },
+        { status: 400 },
+      );
+    }
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

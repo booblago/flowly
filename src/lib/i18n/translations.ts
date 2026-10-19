@@ -380,6 +380,7 @@ export const messages = {
     checkYourEmail: "Check your email",
     accountReady: "Account ready",
     accountReadyHint: "You can log in now with your email and password.",
+    emailTaken: "This email is already registered — log in instead.",
     verifyEmailSent: "We sent a verification link to {email}. Open it to activate your account.",
     verifyEmailManual:
       "Confirm your email with the button below (email provider not configured yet).",
@@ -805,6 +806,7 @@ export const messages = {
     checkYourEmail: "Перевірте пошту",
     accountReady: "Акаунт готовий",
     accountReadyHint: "Тепер можна увійти з email і паролем.",
+    emailTaken: "Цей email уже зареєстровано — увійдіть або зачекайте деплой і спробуйте ще раз.",
     verifyEmailSent: "Ми надіслали посилання на {email}. Відкрийте його, щоб активувати акаунт.",
     verifyEmailManual:
       "Підтвердіть email кнопкою нижче (поштовий сервіс ще не налаштовано).",
@@ -1229,6 +1231,7 @@ export const messages = {
     checkYourEmail: "E-Mail prüfen",
     accountReady: "Konto bereit",
     accountReadyHint: "Du kannst dich jetzt mit E-Mail und Passwort anmelden.",
+    emailTaken: "Diese E-Mail ist bereits registriert — bitte einloggen.",
     verifyEmailSent: "Wir haben einen Link an {email} gesendet. Öffne ihn zur Aktivierung.",
     verifyEmailManual:
       "Bestätige deine E-Mail über den Button (kein Mail-Provider konfiguriert).",
@@ -1654,6 +1657,7 @@ export const messages = {
     checkYourEmail: "Vérifiez votre e-mail",
     accountReady: "Compte prêt",
     accountReadyHint: "Vous pouvez vous connecter avec e-mail et mot de passe.",
+    emailTaken: "Cet e-mail est déjà inscrit — connectez-vous plutôt.",
     verifyEmailSent: "Un lien a été envoyé à {email}. Ouvrez-le pour activer le compte.",
     verifyEmailManual:
       "Confirmez l’e-mail via le bouton ci-dessous (pas de fournisseur e-mail).",
