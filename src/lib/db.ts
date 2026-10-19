@@ -15,12 +15,6 @@ import type {
   Workspace,
 } from "./types";
 import { isProTrigger, planLimits, type PlanId } from "./plans";
-import {
-  emailVerificationRequired,
-  isOwnerEmail,
-  ownerBootstrapPassword,
-  ownerEmails,
-} from "./owner";
 import { LIST_ACCENTS, uid } from "./utils";
 import {
   dbFilePath,
@@ -29,6 +23,29 @@ import {
   saveToSqlite,
   sqliteHasUsers,
 } from "./db/store";
+
+/** Inline env helpers — avoid importing ./owner here (Turbopack circular / TDZ). */
+function ownerEmailList(): string[] {
+  const raw = process.env.OWNER_EMAIL || process.env.OWNER_EMAILS || "";
+  return raw
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function emailIsOwner(email?: string | null) {
+  if (!email) return false;
+  const owners = ownerEmailList();
+  return owners.length > 0 && owners.includes(email.toLowerCase());
+}
+
+function verificationRequired() {
+  return Boolean(process.env.RESEND_API_KEY?.trim());
+}
+
+function ownerPasswordFromEnv() {
+  return (process.env.OWNER_PASSWORD || "").trim() || null;
+}
 
 function boardAllowsUser(db: Database, boardId: string, userId: string) {
   const board = db.boards.find((b) => b.id === boardId);
@@ -303,7 +320,7 @@ export async function createUser(input: {
   const colors = ["#22d3ee", "#f472b6", "#a3e635", "#fbbf24", "#a78bfa"];
   const email = input.email.toLowerCase();
   const skipVerify =
-    !emailVerificationRequired() || isOwnerEmail(email) || email.endsWith("@flowly.app");
+    !verificationRequired() || emailIsOwner(email) || email.endsWith("@flowly.app");
   const now = new Date().toISOString();
   const passwordHash = await bcrypt.hash(input.password, 10);
 
@@ -312,9 +329,9 @@ export async function createUser(input: {
   const existing = await findUserByEmail(email);
   if (existing) {
     const canReclaim =
-      !emailVerificationRequired() ||
+      !verificationRequired() ||
       !existing.passwordHash ||
-      isOwnerEmail(email);
+      emailIsOwner(email);
     if (!canReclaim) {
       throw new Error("Email already registered");
     }
@@ -328,7 +345,7 @@ export async function createUser(input: {
       user.emailVerifiedAt = now;
       user.emailVerifyToken = null;
       user.emailVerifyExpires = null;
-      if (isOwnerEmail(email)) user.plan = "pro";
+      if (emailIsOwner(email)) user.plan = "pro";
       const hasWorkspace = db.workspaces.some(
         (w) => w.ownerId === user.id || w.memberIds.includes(user.id),
       );
@@ -364,7 +381,7 @@ export async function createUser(input: {
     avatarUrl: null,
     bio: "",
     company: "",
-    plan: isOwnerEmail(email) ? "pro" : "free",
+    plan: emailIsOwner(email) ? "pro" : "free",
     stripeCustomerId: null,
     stripeSubscriptionId: null,
     stripeSubscriptionStatus: null,
@@ -398,8 +415,8 @@ export async function createUser(input: {
 
 /** Recreate OWNER_EMAIL after ephemeral Vercel DB wipes so login keeps working. */
 async function ensureOwnerAccounts(db: Database): Promise<boolean> {
-  const password = ownerBootstrapPassword();
-  const emails = ownerEmails();
+  const password = ownerPasswordFromEnv();
+  const emails = ownerEmailList();
   if (!emails.length) return false;
 
   let dirty = false;
