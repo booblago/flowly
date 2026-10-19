@@ -128,45 +128,39 @@ export function OwnerAccountsView() {
                   return (
                     <tr
                       key={user.id}
-                      className={`border-t border-[var(--line)]/70 hover:bg-brand/[0.04] ${
-                        isMe ? "bg-brand/[0.06]" : ""
-                      }`}
+                      className="border-t border-[var(--line)]/70 hover:bg-white/[0.02]"
                     >
-                      <td className="px-4 py-3 font-medium">
-                        <span className="inline-flex flex-wrap items-center gap-2">
-                          {user.name}
+                      <td className="px-4 py-3">
+                        <div className="flex items-baseline gap-2">
+                          <span className="font-medium text-ink">{user.name}</span>
                           {isMe && (
-                            <span className="rounded-full border border-brand/40 bg-brand/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
+                            <span className="text-[11px] text-zinc-500">
                               {t("adminYou")}
                             </span>
                           )}
-                        </span>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-zinc-300">
+                      <td className="px-4 py-3 font-mono text-xs text-zinc-400">
                         {user.email}
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                            user.plan === "pro" ? "chip-pink" : "chip-violet"
-                          }`}
-                        >
-                          {(user.plan || "free").toUpperCase()}
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
+                          {user.plan || "free"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-muted">
                         {user.company || "—"}
                       </td>
-                      <td className="px-4 py-3 font-mono text-[11px] text-muted">
+                      <td className="px-4 py-3 font-mono text-[11px] text-zinc-500">
                         {new Date(user.createdAt).toLocaleString()}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <button
                             type="button"
                             disabled={busyId === user.id || user.plan === "pro"}
                             onClick={() => void setPlan(user.id, "pro")}
-                            className="rounded-full border border-accent/40 px-2.5 py-1 text-[11px] font-semibold text-accent disabled:opacity-40"
+                            className="px-2 py-1 text-[11px] text-zinc-400 transition hover:text-ink disabled:opacity-30"
                           >
                             Pro
                           </button>
@@ -177,28 +171,31 @@ export function OwnerAccountsView() {
                             }
                             onClick={() => void setPlan(user.id, "free")}
                             title={isMe ? t("adminCannotDemoteSelf") : undefined}
-                            className="rounded-full border border-[var(--line)] px-2.5 py-1 text-[11px] font-semibold text-muted disabled:opacity-40"
+                            className="px-2 py-1 text-[11px] text-zinc-400 transition hover:text-ink disabled:opacity-30"
                           >
                             Free
                           </button>
-                          {isMe ? (
-                            <span
-                              className="inline-flex items-center gap-1 rounded-full border border-[var(--line)] px-2.5 py-1 text-[11px] font-semibold text-muted"
-                              title={t("adminCannotDeleteSelf")}
-                            >
-                              {t("adminThisIsYou")}
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              disabled={busyId === user.id}
-                              onClick={() => void removeUser(user)}
-                              className="inline-flex items-center gap-1 rounded-full border border-rose/40 px-2.5 py-1 text-[11px] font-semibold text-rose disabled:opacity-40"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                              {t("delete")}
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            disabled={isMe || busyId === user.id}
+                            onClick={() => {
+                              if (!isMe) void removeUser(user);
+                            }}
+                            title={
+                              isMe
+                                ? t("adminCannotDeleteSelf")
+                                : t("delete")
+                            }
+                            aria-label={
+                              isMe
+                                ? t("adminCannotDeleteSelf")
+                                : t("delete")
+                            }
+                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-500 transition hover:text-rose disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:text-zinc-500"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            {!isMe && t("delete")}
+                          </button>
                         </div>
                       </td>
                     </tr>
