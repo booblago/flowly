@@ -92,7 +92,13 @@ export function OwnerAccountsView() {
             <span className="text-ink">{t("ownerAccounts")}</span>
           </h1>
           <p className="mt-1 text-sm text-muted">
-            {t("ownerAccountsHint")} · {users.length} {t("usersWord")}
+            {t("ownerAccountsHint")}
+            {!loading && (
+              <>
+                {" "}
+                · {users.length} {t("usersWord")}
+              </>
+            )}
           </p>
         </div>
         <button
