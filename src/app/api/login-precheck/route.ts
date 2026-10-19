@@ -37,10 +37,8 @@ export async function POST(req: Request) {
     }
 
     const user = await findUserByEmail(email);
-    if (!user) {
-      return NextResponse.json({ error: "ACCOUNT_MISSING" }, { status: 401 });
-    }
-    if (!(await verifyPassword(user, body.password))) {
+    // Opaque failure — do not reveal whether the email exists.
+    if (!user || !(await verifyPassword(user, body.password))) {
       return NextResponse.json({ error: "INVALID" }, { status: 401 });
     }
     if (!isEmailVerified(user)) {

@@ -47,6 +47,9 @@ function ownerPasswordFromEnv() {
   return (process.env.OWNER_PASSWORD || "").trim() || null;
 }
 
+/** Marker for JWT-revived users after DB wipe — not a valid bcrypt hash. */
+const SESSION_GHOST_HASH = "!session-ghost!";
+
 function boardAllowsUser(db: Database, boardId: string, userId: string) {
   const board = db.boards.find((b) => b.id === boardId);
   if (!board) return false;
@@ -324,14 +327,13 @@ export async function createUser(input: {
   const now = new Date().toISOString();
   const passwordHash = await bcrypt.hash(input.password, 10);
 
-  // After Vercel DB wipes, an orphan account can block register while login fails
-  // (empty/unknown hash). In sandbox (no Resend) reclaim the email + set password.
+  // Only reclaim passwordless session ghosts (empty / marker hash) — never arbitrary
+  // accounts just because Resend is off (that was an account-takeover hole).
   const existing = await findUserByEmail(email);
   if (existing) {
     const canReclaim =
-      !verificationRequired() ||
       !existing.passwordHash ||
-      emailIsOwner(email);
+      existing.passwordHash === SESSION_GHOST_HASH;
     if (!canReclaim) {
       throw new Error("Email already registered");
     }
@@ -538,12 +540,12 @@ export async function ensureSessionUser(input: {
         id: input.id,
         name: (input.name || email.split("@")[0] || "User").trim(),
         email,
-        passwordHash: "",
+        passwordHash: SESSION_GHOST_HASH,
         avatarColor: colors[Math.floor(Math.random() * colors.length)],
         avatarUrl: null,
         bio: "",
         company: "",
-        plan: "free",
+        plan: emailIsOwner(email) ? "pro" : "free",
         stripeCustomerId: null,
         stripeSubscriptionId: null,
         stripeSubscriptionStatus: null,
@@ -554,8 +556,28 @@ export async function ensureSessionUser(input: {
       };
       db.users.push(user);
     } else if (user.id !== input.id) {
-      // Keep session id stable for membership checks.
+      const oldId = user.id;
       user.id = input.id;
+      for (const ws of db.workspaces) {
+        if (ws.ownerId === oldId) ws.ownerId = input.id;
+        ws.memberIds = ws.memberIds.map((id) => (id === oldId ? input.id : id));
+      }
+      for (const board of db.boards) {
+        board.memberIds = board.memberIds.map((id) =>
+          id === oldId ? input.id : id,
+        );
+      }
+      for (const card of db.cards) {
+        card.assigneeIds = card.assigneeIds.map((id) =>
+          id === oldId ? input.id : id,
+        );
+      }
+      for (const n of db.notifications) {
+        if (n.userId === oldId) n.userId = input.id;
+      }
+      for (const a of db.activities) {
+        if (a.userId === oldId) a.userId = input.id;
+      }
     }
 
     const hasWorkspace = db.workspaces.some(
@@ -578,6 +600,12 @@ export async function ensureSessionUser(input: {
 }
 
 export async function verifyPassword(user: User, password: string) {
+  if (!user.passwordHash || user.passwordHash === SESSION_GHOST_HASH) {
+    return false;
+  }
+  if (!user.passwordHash.startsWith("$2")) {
+    return false;
+  }
   return bcrypt.compare(password, user.passwordHash);
 }
 
@@ -610,7 +638,18 @@ export async function updateUserProfile(
   await updateDb((db) => {
     const user = db.users.find((u) => u.id === userId);
     if (!user) return;
-    if (patch.email) user.email = patch.email.toLowerCase();
+    if (patch.email && patch.email.toLowerCase() !== user.email) {
+      user.email = patch.email.toLowerCase();
+      // Force re-verify after email change (unless verification is skipped globally).
+      if (verificationRequired() && !emailIsOwner(user.email)) {
+        user.emailVerifiedAt = null;
+        user.emailVerifyToken =
+          uid("verify").replace(/^verify_/, "") + uid("t");
+        user.emailVerifyExpires = new Date(
+          Date.now() + 24 * 60 * 60 * 1000,
+        ).toISOString();
+      }
+    }
     if (patch.name != null) user.name = patch.name.trim();
     if (patch.bio != null) user.bio = patch.bio;
     if (patch.company != null) user.company = patch.company;
@@ -1117,10 +1156,22 @@ export async function updateCard(
         JSON.stringify(patch.customFieldValues) !==
         JSON.stringify(prev.customFieldValues);
     }
+    const nextComments = patch.comments
+      ? patch.comments.map((c) => {
+          const prior = prev.comments.find((p) => p.id === c.id);
+          if (prior) return prior;
+          return {
+            ...c,
+            userId,
+            createdAt: c.createdAt || new Date().toISOString(),
+          };
+        })
+      : undefined;
     db.cards[idx] = {
       ...prev,
       ...patch,
       id: prev.id,
+      comments: nextComments ?? prev.comments,
       updatedAt: new Date().toISOString(),
     };
     updated = db.cards[idx];
@@ -1219,6 +1270,9 @@ export async function uncompleteCard(cardId: string, userId: string) {
   await updateDb((db) => {
     const card = db.cards.find((c) => c.id === cardId);
     if (!card) return;
+    if (!boardAllowsUser(db, card.boardId, userId)) {
+      throw new Error("Forbidden");
+    }
     const boardLists = db.lists
       .filter((l) => l.boardId === card.boardId)
       .sort((a, b) => a.position - b.position);
@@ -2185,7 +2239,7 @@ export async function enableBoardShare(boardId: string, userId: string) {
   await updateDb((db) => {
     const board = db.boards.find((b) => b.id === boardId);
     if (!board) return;
-    if (!board.memberIds.includes(userId)) {
+    if (!boardAllowsUser(db, boardId, userId)) {
       throw new Error("Forbidden");
     }
     board.shareToken =

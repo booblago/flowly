@@ -91,10 +91,9 @@ export async function confirmCheckoutSession(sessionId: string, userId: string) 
     expand: ["subscription"],
   });
 
-  if (session.client_reference_id && session.client_reference_id !== userId) {
-    throw new Error("Checkout session does not belong to this user");
-  }
-  if (session.metadata?.flowlyUserId && session.metadata.flowlyUserId !== userId) {
+  const boundId =
+    session.client_reference_id || session.metadata?.flowlyUserId || null;
+  if (!boundId || boundId !== userId) {
     throw new Error("Checkout session does not belong to this user");
   }
   if (session.status !== "complete" && session.payment_status !== "paid") {

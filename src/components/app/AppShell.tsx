@@ -9,7 +9,9 @@ import {
   Headphones,
   Inbox,
   LayoutDashboard,
+  Menu,
   Rows3,
+  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Notification } from "@/lib/types";
@@ -31,8 +33,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const t = useT();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [mobileNav, setMobileNav] = useState(false);
   const [compact, setCompact] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  useEffect(() => {
+    setMobileNav(false);
+    setOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     const saved = localStorage.getItem("flowly-density");
@@ -103,6 +111,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               onClick={() => {
                 setOpen((v) => !v);
+                setMobileNav(false);
                 if (!open) void markRead();
               }}
               className="relative rounded-full border border-[var(--line)] p-2 text-muted hover:text-ink"
@@ -116,7 +125,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </button>
             {open && (
-              <div className="absolute right-12 top-12 w-80 rounded-2xl border border-[var(--line)] bg-surface p-3 shadow-xl">
+              <div className="absolute right-0 top-12 z-50 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-[var(--line)] bg-surface p-3 shadow-xl sm:right-12">
                 <div className="mb-2 text-sm font-semibold">{t("notifications")}</div>
                 <div className="max-h-72 space-y-2 overflow-auto">
                   {notifications.length === 0 && (
@@ -137,8 +146,43 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             )}
             <UserMenu />
+            <button
+              type="button"
+              className="rounded-full border border-[var(--line)] p-2 text-muted hover:text-ink md:hidden"
+              aria-label={mobileNav ? t("close") : "Menu"}
+              aria-expanded={mobileNav}
+              onClick={() => {
+                setMobileNav((v) => !v);
+                setOpen(false);
+              }}
+            >
+              {mobileNav ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
           </div>
         </div>
+        {mobileNav && (
+          <nav className="border-t border-[var(--line)] px-4 py-3 md:hidden">
+            <div className="flex flex-col gap-1">
+              {links.map((link) => {
+                const active = pathname.startsWith(link.href);
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium ${
+                      active
+                        ? "bg-brand/15 text-brand"
+                        : "text-muted hover:bg-surface hover:text-ink"
+                    }`}
+                  >
+                    <link.icon className="h-4 w-4" />
+                    {t(link.label)}
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        )}
       </header>
       <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6">
         {children}

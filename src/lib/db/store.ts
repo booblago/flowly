@@ -19,7 +19,7 @@ import {
 } from "./memory";
 import {
   isRemoteDb,
-  loadRemoteDb,
+  loadRemoteDbResult,
   remoteHasUsers,
   saveRemoteDb,
 } from "./remote";
@@ -52,9 +52,14 @@ function jstr(value: unknown) {
 
 export async function loadFromSqlite(): Promise<AppDatabase> {
   if (isRemoteDb()) {
-    const remote = await loadRemoteDb();
-    if (!remote) throw new Error("Remote database is empty");
-    return remote;
+    const remote = await loadRemoteDbResult();
+    if (remote.status === "error") {
+      throw new Error("Remote database temporarily unavailable");
+    }
+    if (remote.status === "empty") {
+      throw new Error("Remote database is empty");
+    }
+    return remote.data;
   }
   if (isMemoryDb()) return loadMemoryDb();
   const { getSqlite, getDb } = localClient();
