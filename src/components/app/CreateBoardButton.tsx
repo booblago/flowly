@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 export function CreateBoardButton({ workspaceId }: { workspaceId: string }) {
@@ -33,6 +33,15 @@ export function CreateBoardButton({ workspaceId }: { workspaceId: string }) {
     },
   ];
 
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   async function create() {
     if (!name.trim()) {
       setError(t("boardNameRequired"));
@@ -40,26 +49,34 @@ export function CreateBoardButton({ workspaceId }: { workspaceId: string }) {
     }
     setLoading(true);
     setError("");
-    const res = await fetch("/api/boards", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        workspaceId,
-        name: name.trim(),
-        template,
-      }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    if (!res.ok) {
-      setError(data.error || t("saveFailed"));
-      return;
-    }
-    setOpen(false);
-    setName("");
-    if (data.board?.id) {
-      router.push(`/board/${data.board.id}`);
-      router.refresh();
+    try {
+      const res = await fetch("/api/boards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceId,
+          name: name.trim(),
+          template,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        board?: { id?: string };
+      };
+      if (!res.ok) {
+        setError(data.error || t("saveFailed"));
+        return;
+      }
+      setOpen(false);
+      setName("");
+      if (data.board?.id) {
+        router.push(`/board/${data.board.id}`);
+        router.refresh();
+      }
+    } catch {
+      setError(t("saveFailed"));
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -80,15 +97,22 @@ export function CreateBoardButton({ workspaceId }: { workspaceId: string }) {
             type="button"
             className="absolute inset-0 bg-black/70"
             aria-label={t("close")}
-            onClick={() => setOpen(false)}
+            onClick={() => !loading && setOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-md rounded-t-3xl border border-white/10 bg-[#0c0c0e] p-5 shadow-2xl sm:rounded-3xl">
+          <form
+            className="relative z-10 max-h-[min(92dvh,720px)] w-full max-w-md overflow-y-auto rounded-t-3xl border border-white/10 bg-[#0c0c0e] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void create();
+            }}
+          >
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-display text-xl font-bold">{t("newBoard")}</h2>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="text-sm text-zinc-500 hover:text-white"
+                disabled={loading}
+                className="text-sm text-zinc-500 hover:text-white disabled:opacity-50"
               >
                 {t("close")}
               </button>
@@ -100,7 +124,9 @@ export function CreateBoardButton({ workspaceId }: { workspaceId: string }) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t("boardNamePlaceholder")}
-                className="mt-1.5 w-full rounded-2xl border border-white/10 bg-black px-4 py-3 text-sm outline-none ring-brand focus:ring-2"
+                enterKeyHint="done"
+                autoComplete="off"
+                className="mt-1.5 w-full rounded-2xl border border-white/10 bg-black px-4 py-3 text-base outline-none ring-brand focus:ring-2 sm:text-sm"
                 autoFocus
               />
             </label>
@@ -129,14 +155,13 @@ export function CreateBoardButton({ workspaceId }: { workspaceId: string }) {
             {error && <p className="mt-3 text-sm text-rose">{error}</p>}
 
             <button
-              type="button"
+              type="submit"
               disabled={loading}
-              onClick={() => void create()}
               className="mt-5 w-full rounded-2xl bg-white py-3.5 text-sm font-bold text-black disabled:opacity-60"
             >
               {loading ? t("creating") : t("createBoard")}
             </button>
-          </div>
+          </form>
         </div>
       )}
     </>

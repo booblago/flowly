@@ -17,8 +17,20 @@ import {
   memoryHasUsers,
   saveMemoryDb,
 } from "./memory";
+import {
+  isRemoteDb,
+  loadRemoteDb,
+  remoteHasUsers,
+  saveRemoteDb,
+} from "./remote";
 import { exportPrivateOwnerTables } from "./private-export";
 import * as schema from "./schema";
+
+export { isMemoryDb, isRemoteDb };
+
+function usesEphemeralStore() {
+  return isRemoteDb() || isMemoryDb();
+}
 
 function localClient() {
   // Lazy — avoid loading native better-sqlite3 on Vercel.
@@ -38,7 +50,12 @@ function jstr(value: unknown) {
   return JSON.stringify(value ?? null);
 }
 
-export function loadFromSqlite(): AppDatabase {
+export async function loadFromSqlite(): Promise<AppDatabase> {
+  if (isRemoteDb()) {
+    const remote = await loadRemoteDb();
+    if (!remote) throw new Error("Remote database is empty");
+    return remote;
+  }
   if (isMemoryDb()) return loadMemoryDb();
   const { getSqlite, getDb } = localClient();
   getSqlite();
@@ -179,7 +196,11 @@ export function loadFromSqlite(): AppDatabase {
   };
 }
 
-export function saveToSqlite(data: AppDatabase) {
+export async function saveToSqlite(data: AppDatabase) {
+  if (isRemoteDb()) {
+    await saveRemoteDb(data);
+    return;
+  }
   if (isMemoryDb()) {
     saveMemoryDb(data);
     return;
@@ -357,12 +378,13 @@ export function saveToSqlite(data: AppDatabase) {
   });
 
   tx();
-  if (!isMemoryDb()) {
+  if (!usesEphemeralStore()) {
     exportPrivateOwnerTables(data);
   }
 }
 
-export function sqliteHasUsers() {
+export async function sqliteHasUsers() {
+  if (isRemoteDb()) return remoteHasUsers();
   if (isMemoryDb()) return memoryHasUsers();
   const { getSqlite } = localClient();
   const row = getSqlite()
@@ -384,6 +406,15 @@ export async function importLegacyJsonIfPresent(): Promise<AppDatabase | null> {
 }
 
 export function dbFilePath() {
+  if (isRemoteDb()) {
+    if (
+      process.env.UPSTASH_REDIS_REST_URL &&
+      process.env.UPSTASH_REDIS_REST_TOKEN
+    ) {
+      return "(upstash-redis)";
+    }
+    return "(vercel-runtime-cache)";
+  }
   if (isMemoryDb()) return "(memory)";
   return localClient().SQLITE_PATH;
 }

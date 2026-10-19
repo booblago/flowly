@@ -1,8 +1,10 @@
 import type { Database as AppDatabase } from "@/lib/types";
+import { isRemoteDb } from "./remote";
 
-/** Vercel (serverless) has no persistent disk — keep DB in process memory. */
+/** Process-local fallback when no shared remote store is available. */
 export function isMemoryDb() {
-  return process.env.VERCEL === "1" || process.env.FLOWLY_MEMORY_DB === "1";
+  if (isRemoteDb()) return false;
+  return process.env.FLOWLY_MEMORY_DB === "1";
 }
 
 declare global {

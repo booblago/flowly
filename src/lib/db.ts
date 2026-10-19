@@ -216,12 +216,12 @@ function findDoneList(db: Database, boardId: string) {
 }
 
 async function ensureDb(): Promise<Database> {
-  if (sqliteHasUsers()) {
-    const data = migrate(loadFromSqlite());
+  if (await sqliteHasUsers()) {
+    const data = migrate(await loadFromSqlite());
     const demo = data.users.find((u) => u.email === "demo@flowly.app");
     if (demo && demo.plan !== "pro") {
       demo.plan = "pro";
-      saveToSqlite(data);
+      await saveToSqlite(data);
     }
     return data;
   }
@@ -231,20 +231,20 @@ async function ensureDb(): Promise<Database> {
     const migrated = migrate(legacy);
     if (!migrated.automations?.length && migrated.boards.some((b) => b.id === "brd_product")) {
       const seeded = await buildSeed();
-      saveToSqlite(seeded);
+      await saveToSqlite(seeded);
       return seeded;
     }
-    saveToSqlite(migrated);
+    await saveToSqlite(migrated);
     return migrated;
   }
 
   const seeded = await buildSeed();
-  saveToSqlite(seeded);
+  await saveToSqlite(seeded);
   return seeded;
 }
 
-function writeDb(db: Database) {
-  saveToSqlite(migrate(db));
+async function writeDb(db: Database) {
+  await saveToSqlite(migrate(db));
 }
 
 export async function readDb() {
@@ -254,7 +254,7 @@ export async function readDb() {
 export async function updateDb(mutator: (db: Database) => void) {
   const db = await ensureDb();
   mutator(db);
-  writeDb(db);
+  await writeDb(db);
   return db;
 }
 
@@ -648,16 +648,6 @@ export async function createBoard(input: {
   userId: string;
   template?: "delivery" | "support" | "content";
 }) {
-  await assertWorkspaceAccess(input.userId, input.workspaceId);
-  const plan = await getUserPlan(input.userId);
-  const limits = planLimits(plan);
-  const existingBoards = await getBoardsForUser(input.userId);
-  if (existingBoards.length >= limits.boards) {
-    throw new Error(
-      `Free plan allows ${limits.boards} boards. Upgrade to Pro for unlimited boards.`,
-    );
-  }
-
   const template = input.template ?? "delivery";
   const presets = {
     delivery: {
@@ -734,7 +724,29 @@ export async function createBoard(input: {
     accent: item.accent,
   }));
 
+  // Access + plan + insert in one read/write so Vercel shared cache stays consistent.
   await updateDb((db) => {
+    const ws = db.workspaces.find((w) => w.id === input.workspaceId);
+    if (!ws || !ws.memberIds.includes(input.userId)) {
+      throw new Error("Forbidden");
+    }
+    const user = db.users.find((u) => u.id === input.userId);
+    const plan: PlanId = user?.plan === "pro" ? "pro" : "free";
+    const limits = planLimits(plan);
+    const workspaceIds = db.workspaces
+      .filter((w) => w.memberIds.includes(input.userId))
+      .map((w) => w.id);
+    const existingCount = db.boards.filter(
+      (b) =>
+        workspaceIds.includes(b.workspaceId) ||
+        b.memberIds.includes(input.userId),
+    ).length;
+    if (existingCount >= limits.boards) {
+      throw new Error(
+        `Free plan allows ${limits.boards} boards. Upgrade to Pro for unlimited boards.`,
+      );
+    }
+
     db.boards.push(board);
     db.lists.push(...defaultLists);
     const inProgress = defaultLists.find((l) =>
