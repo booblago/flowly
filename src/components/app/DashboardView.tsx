@@ -61,9 +61,13 @@ export function DashboardView({
                 <div className="mt-2 font-display text-2xl font-bold">
                   {board.name}
                 </div>
-                <p className="mt-2 line-clamp-2 text-sm text-muted">
-                  {board.description || t("openBoard")}
-                </p>
+                {board.description ? (
+                  <p className="mt-2 line-clamp-2 text-sm text-muted">
+                    {board.description}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-sm text-muted/70">&nbsp;</p>
+                )}
                 <div
                   className="mt-6 text-sm font-medium"
                   style={{ color: accent }}
