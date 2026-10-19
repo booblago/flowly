@@ -434,6 +434,10 @@ export const messages = {
     usersWord: "users",
     actions: "Actions",
     refresh: "Refresh",
+    adminYou: "You",
+    adminThisIsYou: "This is you",
+    adminCannotDeleteSelf: "You cannot delete your own account here.",
+    adminCannotDemoteSelf: "You cannot demote your own owner plan here.",
   },
   uk: {
     brand: "Flowly",
@@ -859,6 +863,10 @@ export const messages = {
     usersWord: "користувачів",
     actions: "Дії",
     refresh: "Оновити",
+    adminYou: "Це я",
+    adminThisIsYou: "Не можна видалити себе",
+    adminCannotDeleteSelf: "Свій акаунт тут видалити не можна.",
+    adminCannotDemoteSelf: "Свій owner-план тут понизити не можна.",
   },
   de: {
     brand: "Flowly",
@@ -1284,6 +1292,10 @@ export const messages = {
     usersWord: "User",
     actions: "Aktionen",
     refresh: "Aktualisieren",
+    adminYou: "Du",
+    adminThisIsYou: "Das bist du",
+    adminCannotDeleteSelf: "Eigenes Konto kann hier nicht gelöscht werden.",
+    adminCannotDemoteSelf: "Eigenen Owner-Plan hier nicht herabstufen.",
   },
   fr: {
     brand: "Flowly",
@@ -1710,6 +1722,10 @@ export const messages = {
     usersWord: "utilisateurs",
     actions: "Actions",
     refresh: "Actualiser",
+    adminYou: "Vous",
+    adminThisIsYou: "C’est vous",
+    adminCannotDeleteSelf: "Vous ne pouvez pas supprimer votre propre compte ici.",
+    adminCannotDemoteSelf: "Vous ne pouvez pas rétrograder votre plan owner ici.",
   },
 } as const;
 

@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { RefreshCw, Trash2 } from "lucide-react";
 import type { PublicUser } from "@/lib/types";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 export function OwnerAccountsView() {
   const t = useT();
+  const { data: session } = useSession();
+  const meId = session?.user?.id;
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -120,61 +123,87 @@ export function OwnerAccountsView() {
                 </tr>
               )}
               {!loading &&
-                users.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="border-t border-[var(--line)]/70 hover:bg-brand/[0.04]"
-                  >
-                    <td className="px-4 py-3 font-medium">{user.name}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-zinc-300">
-                      {user.email}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                          user.plan === "pro" ? "chip-pink" : "chip-violet"
-                        }`}
-                      >
-                        {(user.plan || "free").toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-muted">
-                      {user.company || "—"}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-[11px] text-muted">
-                      {new Date(user.createdAt).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          disabled={busyId === user.id || user.plan === "pro"}
-                          onClick={() => void setPlan(user.id, "pro")}
-                          className="rounded-full border border-accent/40 px-2.5 py-1 text-[11px] font-semibold text-accent disabled:opacity-40"
+                users.map((user) => {
+                  const isMe = Boolean(meId && user.id === meId);
+                  return (
+                    <tr
+                      key={user.id}
+                      className={`border-t border-[var(--line)]/70 hover:bg-brand/[0.04] ${
+                        isMe ? "bg-brand/[0.06]" : ""
+                      }`}
+                    >
+                      <td className="px-4 py-3 font-medium">
+                        <span className="inline-flex flex-wrap items-center gap-2">
+                          {user.name}
+                          {isMe && (
+                            <span className="rounded-full border border-brand/40 bg-brand/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
+                              {t("adminYou")}
+                            </span>
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-zinc-300">
+                        {user.email}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                            user.plan === "pro" ? "chip-pink" : "chip-violet"
+                          }`}
                         >
-                          Pro
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busyId === user.id || user.plan === "free"}
-                          onClick={() => void setPlan(user.id, "free")}
-                          className="rounded-full border border-[var(--line)] px-2.5 py-1 text-[11px] font-semibold text-muted disabled:opacity-40"
-                        >
-                          Free
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busyId === user.id}
-                          onClick={() => void removeUser(user)}
-                          className="inline-flex items-center gap-1 rounded-full border border-rose/40 px-2.5 py-1 text-[11px] font-semibold text-rose disabled:opacity-40"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          {t("delete")}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {(user.plan || "free").toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-muted">
+                        {user.company || "—"}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-[11px] text-muted">
+                        {new Date(user.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={busyId === user.id || user.plan === "pro"}
+                            onClick={() => void setPlan(user.id, "pro")}
+                            className="rounded-full border border-accent/40 px-2.5 py-1 text-[11px] font-semibold text-accent disabled:opacity-40"
+                          >
+                            Pro
+                          </button>
+                          <button
+                            type="button"
+                            disabled={
+                              busyId === user.id || user.plan === "free" || isMe
+                            }
+                            onClick={() => void setPlan(user.id, "free")}
+                            title={isMe ? t("adminCannotDemoteSelf") : undefined}
+                            className="rounded-full border border-[var(--line)] px-2.5 py-1 text-[11px] font-semibold text-muted disabled:opacity-40"
+                          >
+                            Free
+                          </button>
+                          {isMe ? (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full border border-[var(--line)] px-2.5 py-1 text-[11px] font-semibold text-muted"
+                              title={t("adminCannotDeleteSelf")}
+                            >
+                              {t("adminThisIsYou")}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={busyId === user.id}
+                              onClick={() => void removeUser(user)}
+                              className="inline-flex items-center gap-1 rounded-full border border-rose/40 px-2.5 py-1 text-[11px] font-semibold text-rose disabled:opacity-40"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              {t("delete")}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
