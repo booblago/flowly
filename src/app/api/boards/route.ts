@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const limited = rateLimit(
+    const limited = await rateLimit(
       `boards-create:${session.user.id}:${clientIp(req)}`,
       20,
       60 * 60 * 1000,

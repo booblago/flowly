@@ -25,7 +25,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const password = String(credentials?.password ?? "");
         if (!email || !password) return null;
 
-        const limited = rateLimit(`login:${email}`, 10, 15 * 60 * 1000);
+        const limited = await rateLimit(`login:${email}`, 10, 15 * 60 * 1000);
         if (!limited.ok) {
           throw new Error(`Too many login attempts. Try again in ${limited.retryAfterSec}s.`);
         }

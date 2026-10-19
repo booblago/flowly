@@ -1,13 +1,53 @@
+import { Redis } from "@upstash/redis";
+
 type Bucket = { count: number; resetAt: number };
 
 const buckets = new Map<string, Bucket>();
 
-/** Simple in-memory sliding window. Good enough per Vercel instance. */
-export function rateLimit(
+function hasRedis() {
+  return Boolean(
+    process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN,
+  );
+}
+
+type RateLimitResult =
+  | { ok: true; remaining: number }
+  | { ok: false; retryAfterSec: number };
+
+/** Shared across Vercel instances when Upstash is configured. */
+export async function rateLimit(
   key: string,
   limit: number,
   windowMs: number,
-): { ok: true; remaining: number } | { ok: false; retryAfterSec: number } {
+): Promise<RateLimitResult> {
+  if (hasRedis()) {
+    try {
+      const redis = Redis.fromEnv();
+      const redisKey = `rl:${key}`;
+      const count = await redis.incr(redisKey);
+      if (count === 1) {
+        await redis.pexpire(redisKey, windowMs);
+      }
+      if (count > limit) {
+        const ttl = await redis.pttl(redisKey);
+        return {
+          ok: false,
+          retryAfterSec: Math.max(1, Math.ceil((ttl > 0 ? ttl : windowMs) / 1000)),
+        };
+      }
+      return { ok: true, remaining: Math.max(0, limit - count) };
+    } catch (error) {
+      console.error("[rate-limit] redis failed, falling back to memory", error);
+    }
+  }
+  return rateLimitMemory(key, limit, windowMs);
+}
+
+function rateLimitMemory(
+  key: string,
+  limit: number,
+  windowMs: number,
+): RateLimitResult {
   const now = Date.now();
   const current = buckets.get(key);
   if (!current || now >= current.resetAt) {

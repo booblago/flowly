@@ -11,7 +11,7 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   const ip = clientIp(req);
-  const ipLimit = rateLimit(`login-ip:${ip}`, 30, 15 * 60 * 1000);
+  const ipLimit = await rateLimit(`login-ip:${ip}`, 30, 15 * 60 * 1000);
   if (!ipLimit.ok) {
     return NextResponse.json(
       { error: `Too many attempts. Try again in ${ipLimit.retryAfterSec}s.` },
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid email" }, { status: 400 });
     }
 
-    const emailLimit = rateLimit(`login-email:${email}`, 10, 15 * 60 * 1000);
+    const emailLimit = await rateLimit(`login-email:${email}`, 10, 15 * 60 * 1000);
     if (!emailLimit.ok) {
       return NextResponse.json(
         {

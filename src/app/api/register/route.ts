@@ -12,7 +12,7 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   const ip = clientIp(req);
-  const limited = rateLimit(`register:${ip}`, 5, 60 * 60 * 1000);
+  const limited = await rateLimit(`register:${ip}`, 5, 60 * 60 * 1000);
   if (!limited.ok) {
     return NextResponse.json(
       { error: `Too many signups. Try again in ${limited.retryAfterSec}s.` },
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
 
-    const emailLimited = rateLimit(`register-email:${email}`, 3, 60 * 60 * 1000);
+    const emailLimited = await rateLimit(`register-email:${email}`, 3, 60 * 60 * 1000);
     if (!emailLimited.ok) {
       return NextResponse.json(
         { error: `Too many attempts for this email. Try again in ${emailLimited.retryAfterSec}s.` },

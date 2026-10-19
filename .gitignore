@@ -54,3 +54,7 @@ data/private/
 !data/.gitkeep
 
 .vercel
+.env*
+
+.vercel-secrets.tmp
+

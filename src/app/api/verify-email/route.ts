@@ -4,7 +4,7 @@ import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 export async function GET(req: Request) {
   const ip = clientIp(req);
-  const limited = rateLimit(`verify:${ip}`, 30, 60 * 60 * 1000);
+  const limited = await rateLimit(`verify:${ip}`, 30, 60 * 60 * 1000);
   if (!limited.ok) {
     return NextResponse.json(
       { error: `Too many attempts. Try again in ${limited.retryAfterSec}s.` },
