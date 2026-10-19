@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { RefreshCw, Trash2 } from "lucide-react";
 import type { PublicUser } from "@/lib/types";
@@ -14,6 +14,15 @@ export function OwnerAccountsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  const sortedUsers = useMemo(() => {
+    if (!meId) return users;
+    return [...users].sort((a, b) => {
+      if (a.id === meId) return -1;
+      if (b.id === meId) return 1;
+      return b.createdAt.localeCompare(a.createdAt);
+    });
+  }, [users, meId]);
 
   async function load() {
     setLoading(true);
@@ -52,6 +61,7 @@ export function OwnerAccountsView() {
   }
 
   async function removeUser(user: PublicUser) {
+    if (meId && user.id === meId) return;
     const ok = window.confirm(
       t("confirmDeleteUser").replace("{email}", user.email),
     );
@@ -104,7 +114,7 @@ export function OwnerAccountsView() {
       <div className="mt-6 overflow-hidden rounded-[24px] border border-[var(--line)] bg-surface shadow-[0_24px_60px_rgba(0,0,0,.45)]">
         <div className="max-h-[70vh] overflow-auto">
           <table className="min-w-full border-collapse text-left text-sm">
-            <thead className="sticky top-0 bg-paper">
+            <thead className="sticky top-0 z-20 bg-paper">
               <tr className="text-[11px] uppercase tracking-[0.08em] text-muted">
                 <th className="px-4 py-3 font-semibold">Name</th>
                 <th className="px-4 py-3 font-semibold">Email</th>
@@ -123,79 +133,65 @@ export function OwnerAccountsView() {
                 </tr>
               )}
               {!loading &&
-                users.map((user) => {
+                sortedUsers.map((user) => {
                   const isMe = Boolean(meId && user.id === meId);
                   return (
                     <tr
                       key={user.id}
-                      className="border-t border-[var(--line)]/70 hover:bg-white/[0.02]"
+                      className={`border-t border-[var(--line)]/70 hover:bg-brand/[0.04] ${
+                        isMe
+                          ? "sticky top-[41px] z-10 bg-[#0a0a0c] shadow-[0_1px_0_rgba(255,255,255,0.06)]"
+                          : ""
+                      }`}
                     >
-                      <td className="px-4 py-3">
-                        <div className="flex items-baseline gap-2">
-                          <span className="font-medium text-ink">{user.name}</span>
-                          {isMe && (
-                            <span className="text-[11px] text-zinc-500">
-                              {t("adminYou")}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-zinc-400">
+                      <td className="px-4 py-3 font-medium">{user.name}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-zinc-300">
                         {user.email}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
-                          {user.plan || "free"}
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                            user.plan === "pro" ? "chip-pink" : "chip-violet"
+                          }`}
+                        >
+                          {(user.plan || "free").toUpperCase()}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-muted">
                         {user.company || "—"}
                       </td>
-                      <td className="px-4 py-3 font-mono text-[11px] text-zinc-500">
+                      <td className="px-4 py-3 font-mono text-[11px] text-muted">
                         {new Date(user.createdAt).toLocaleString()}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
                             disabled={busyId === user.id || user.plan === "pro"}
                             onClick={() => void setPlan(user.id, "pro")}
-                            className="px-2 py-1 text-[11px] text-zinc-400 transition hover:text-ink disabled:opacity-30"
+                            className="rounded-full border border-accent/40 px-2.5 py-1 text-[11px] font-semibold text-accent disabled:opacity-40"
                           >
                             Pro
                           </button>
                           <button
                             type="button"
-                            disabled={
-                              busyId === user.id || user.plan === "free" || isMe
-                            }
+                            disabled={busyId === user.id || user.plan === "free"}
                             onClick={() => void setPlan(user.id, "free")}
-                            title={isMe ? t("adminCannotDemoteSelf") : undefined}
-                            className="px-2 py-1 text-[11px] text-zinc-400 transition hover:text-ink disabled:opacity-30"
+                            className="rounded-full border border-[var(--line)] px-2.5 py-1 text-[11px] font-semibold text-muted disabled:opacity-40"
                           >
                             Free
                           </button>
-                          <button
-                            type="button"
-                            disabled={isMe || busyId === user.id}
-                            onClick={() => {
-                              if (!isMe) void removeUser(user);
-                            }}
-                            title={
-                              isMe
-                                ? t("adminCannotDeleteSelf")
-                                : t("delete")
-                            }
-                            aria-label={
-                              isMe
-                                ? t("adminCannotDeleteSelf")
-                                : t("delete")
-                            }
-                            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-500 transition hover:text-rose disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:text-zinc-500"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            {!isMe && t("delete")}
-                          </button>
+                          {!isMe && (
+                            <button
+                              type="button"
+                              disabled={busyId === user.id}
+                              onClick={() => void removeUser(user)}
+                              className="inline-flex items-center gap-1 rounded-full border border-rose/40 px-2.5 py-1 text-[11px] font-semibold text-rose disabled:opacity-40"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              {t("delete")}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
