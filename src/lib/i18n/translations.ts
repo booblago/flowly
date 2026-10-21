@@ -67,7 +67,7 @@ export const messages = {
     how3Text: "Inbox, analytics, and Completed keep today’s wins and long-term history clear.",
     audienceTitle: "Built for people who sell and deliver work",
     audienceLead: "Whether you freelance, run an agency, or ship product — Flowly keeps the board honest.",
-    audience1Title: "Freelancers & Upwork sellers",
+    audience1Title: "Freelancers & consultants",
     audience1Text:
       "Show clients a polished workspace in minutes. Demo board + clear delivery story = trust before the contract.",
     audience2Title: "Product & ops teams",
@@ -543,7 +543,7 @@ export const messages = {
     how3Text: "Inbox, аналітика й Виконані тримають сьогоднішні перемоги й історію під контролем.",
     audienceTitle: "Для тих, хто продає й постачає роботу",
     audienceLead: "Фриланс, агенція чи продуктова команда — Flowly тримає дошку чесною.",
-    audience1Title: "Фрилансери й Upwork",
+    audience1Title: "Фрилансери та консультанти",
     audience1Text:
       "Покажи клієнту полірований workspace за хвилини. Демо-дошка + чітка історія поставки = довіра до контракту.",
     audience2Title: "Product і ops команди",
@@ -1018,7 +1018,7 @@ export const messages = {
     how3Text: "Inbox, Analytics und Erledigt halten heutige Wins und Historie klar.",
     audienceTitle: "Für alle, die Arbeit verkaufen und liefern",
     audienceLead: "Freelance, Agentur oder Product — Flowly hält das Board ehrlich.",
-    audience1Title: "Freelancer & Upwork",
+    audience1Title: "Freelancer & Berater",
     audience1Text:
       "Zeigen Sie in Minuten einen polierten Workspace. Demo + klare Delivery-Story = Vertrauen vor dem Vertrag.",
     audience2Title: "Product- & Ops-Teams",
@@ -1493,7 +1493,7 @@ export const messages = {
     how3Text: "Inbox, analytics et Terminées gardent wins du jour et historique clairs.",
     audienceTitle: "Pour ceux qui vendent et livrent",
     audienceLead: "Freelance, agence ou produit — Flowly garde le board honnête.",
-    audience1Title: "Freelances & Upwork",
+    audience1Title: "Freelances & consultants",
     audience1Text:
       "Montrez un workspace soigné en minutes. Démo + story de livraison = confiance avant le contrat.",
     audience2Title: "Équipes product & ops",

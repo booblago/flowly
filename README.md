@@ -1,6 +1,6 @@
 # Flowly
 
-A Trello-class delivery board built with **Next.js + TypeScript** — kanban plus inbox, automations, SLA, analytics, and Stripe billing. Built to demo on Upwork with a real live URL (not localhost-only).
+A Trello-class delivery board built with **Next.js + TypeScript** — kanban plus inbox, automations, SLA, analytics, and Stripe billing. Live product URL included (not localhost-only).
 
 ## Live demo
 
@@ -29,7 +29,7 @@ Or open **Demo board** from the landing / login page — no signup needed.
 - Recurring cards + client share reports (Pro)
 - Free / Pro plans with Stripe Checkout + Customer Portal
 - Multilingual UI (EN / UK / DE / FR), legal + support pages
-- Demo seed data for client walkthroughs
+- Seeded demo board for a quick product walkthrough
 
 ## Database (real persistence)
 
@@ -60,7 +60,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
-Localhost only works on your machine — share the **Vercel demo URL** with clients.
+Localhost only works on your machine — use the **live demo URL** to share the product.
 
 ### Stripe billing (Flowly Pro)
 
@@ -95,9 +95,9 @@ Use Stripe test cards (e.g. `4242 4242 4242 4242`).
 - `npm run db:studio` — open Drizzle Studio (local SQLite)
 - `npm run db:reset` — wipe local SQLite + reseed on next boot
 
-## Upwork walkthrough
+## Product walkthrough
 
-Share **live demo URL + this repo**. Suggested path:
+Suggested path on the live demo:
 
 1. Landing → one-click **Demo board**
 2. Drag cards, set priority, open a card (checklist / comments)
