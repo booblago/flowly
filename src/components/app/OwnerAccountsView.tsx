@@ -42,22 +42,45 @@ export function OwnerAccountsView() {
   }, []);
 
   async function setPlan(userId: string, plan: "free" | "pro") {
-    setBusyId(userId);
+    const previous = users.find((u) => u.id === userId)?.plan ?? "free";
+    if (previous === plan) return;
+
+    // Optimistic — flip UI immediately; Redis round-trip can take a second.
     setError("");
-    const res = await fetch("/api/admin/users", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, plan }),
-    });
-    const data = await res.json();
-    setBusyId(null);
-    if (!res.ok) {
-      setError(data.error || t("saveFailed"));
-      return;
-    }
+    setBusyId(userId);
     setUsers((prev) =>
       prev.map((u) => (u.id === userId ? { ...u, plan } : u)),
     );
+
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, plan }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, plan: previous } : u)),
+        );
+        setError(data.error || t("saveFailed"));
+        return;
+      }
+      if (data.user?.plan) {
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === userId ? { ...u, plan: data.user.plan } : u,
+          ),
+        );
+      }
+    } catch {
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, plan: previous } : u)),
+      );
+      setError(t("saveFailed"));
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function removeUser(user: PublicUser) {

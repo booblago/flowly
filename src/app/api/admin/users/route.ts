@@ -4,9 +4,9 @@ import { auth } from "@/lib/auth";
 import {
   deleteUserAccount,
   listUsersForAdmin,
-  setUserPlan,
   toPublicUser,
   findUserById,
+  updateDb,
 } from "@/lib/db";
 import { isOwnerEmail } from "@/lib/owner";
 
@@ -38,23 +38,41 @@ export async function PATCH(req: Request) {
   if ("error" in gate && gate.error) return gate.error;
   try {
     const body = patchSchema.parse(await req.json());
-    const target = await findUserById(body.userId);
-    if (!target) {
+    if (!body.plan) {
+      const target = await findUserById(body.userId);
+      if (!target) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
+      return NextResponse.json({ user: toPublicUser(target) });
+    }
+
+    // Single DB round-trip: load → validate → mutate → save
+    let result: ReturnType<typeof toPublicUser> | null = null;
+    let fail: "not_found" | "owner" | null = null;
+    await updateDb((db) => {
+      const target = db.users.find((u) => u.id === body.userId);
+      if (!target) {
+        fail = "not_found";
+        return;
+      }
+      if (isOwnerEmail(target.email) && body.plan === "free") {
+        fail = "owner";
+        return;
+      }
+      target.plan = body.plan!;
+      result = toPublicUser(target);
+    });
+
+    if (fail === "not_found") {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-    if (isOwnerEmail(target.email) && body.plan === "free") {
+    if (fail === "owner") {
       return NextResponse.json(
         { error: "Cannot demote an owner account" },
         { status: 400 },
       );
     }
-    if (body.plan) {
-      const user = await setUserPlan(body.userId, body.plan);
-      return NextResponse.json({ user });
-    }
-    return NextResponse.json({
-      user: toPublicUser(target),
-    });
+    return NextResponse.json({ user: result });
   } catch (error) {
     console.error("[admin/users PATCH]", error);
     return NextResponse.json({ error: "Request failed" }, { status: 400 });
