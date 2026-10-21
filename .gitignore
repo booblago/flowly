@@ -58,3 +58,11 @@ data/private/
 
 .vercel-secrets.tmp
 
+# Local agent / IDE notes (may contain owner email & passwords — never commit)
+.cursor/
+.vscode/.vscode/
+
+# Local ops scripts that read secrets / personal emails
+scripts/check-prod-db.mjs
+scripts/*-owner-pw.mjs
+
