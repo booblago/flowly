@@ -8,9 +8,13 @@ import {
   BarChart3,
   CalendarDays,
   Check,
+  CreditCard,
+  Database,
   Gauge,
   Inbox,
   LayoutDashboard,
+  Server,
+  Shield,
   Sparkles,
   Workflow,
   Zap,
@@ -95,6 +99,24 @@ export function LandingPage() {
     "compare3",
     "compare4",
     "compare5",
+  ];
+
+  const stackItems: {
+    icon: typeof Database;
+    title: MessageKey;
+    text: MessageKey;
+  }[] = [
+    { icon: Database, title: "stackDbTitle", text: "stackDbText" },
+    { icon: CreditCard, title: "stackPayTitle", text: "stackPayText" },
+    { icon: Shield, title: "stackAuthTitle", text: "stackAuthText" },
+    { icon: Server, title: "stackApiTitle", text: "stackApiText" },
+  ];
+
+  const trustChips: MessageKey[] = [
+    "trustChipDb",
+    "trustChipPay",
+    "trustChipAuth",
+    "trustChipAuto",
   ];
 
   return (
@@ -224,6 +246,16 @@ export function LandingPage() {
             <p className="mt-4 text-xs text-muted">
               {signedIn ? t("signedInHint") : t("demoBoardHint")}
             </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {trustChips.map((key) => (
+                <span
+                  key={key}
+                  className="rounded-full border border-[var(--line)] bg-surface/70 px-3 py-1 text-[11px] font-semibold tracking-wide text-zinc-200"
+                >
+                  {t(key)}
+                </span>
+              ))}
+            </div>
           </div>
 
           <motion.div
@@ -463,6 +495,43 @@ export function LandingPage() {
           </div>
         </section>
 
+        <section className="border-t border-[var(--line)] bg-gradient-to-b from-black/50 to-black/80 py-20">
+          <div className="mx-auto max-w-6xl px-6">
+            <SectionLabel>{t("stackLabel")}</SectionLabel>
+            <h2 className="font-display max-w-3xl text-3xl font-bold sm:text-4xl">
+              {t("stackTitle")}
+            </h2>
+            <p className="mt-4 max-w-2xl text-base leading-relaxed text-zinc-300">
+              {t("stackLead")}
+            </p>
+            <div className="mt-12 grid gap-5 sm:grid-cols-2">
+              {stackItems.map((item, index) => {
+                const Icon = item.icon;
+                return (
+                  <motion.div
+                    key={item.title}
+                    initial={{ opacity: 0, y: 14 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-40px" }}
+                    transition={{ delay: index * 0.05 }}
+                    className="rounded-[24px] border border-[var(--line)] bg-surface/70 p-6"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-brand/30 bg-brand/10 text-brand">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <h3 className="mt-4 font-display text-xl font-bold">
+                      {t(item.title)}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-300">
+                      {t(item.text)}
+                    </p>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
         <section className="border-t border-[var(--line)] py-20">
           <div className="mx-auto max-w-6xl px-6">
             <SectionLabel>{t("pricing")}</SectionLabel>
@@ -470,6 +539,9 @@ export function LandingPage() {
               {t("pricingTitle")}
             </h2>
             <p className="mt-3 max-w-xl text-zinc-300">{t("pricingLead")}</p>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-accent">
+              {t("pricingPoweredBy")}
+            </p>
             <div className="mt-10 grid gap-6 lg:grid-cols-2">
               <div className="rounded-[28px] border border-[var(--line)] bg-surface/80 p-7">
                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-muted">
@@ -499,7 +571,7 @@ export function LandingPage() {
               </div>
               <div className="relative overflow-hidden rounded-[28px] border border-accent/40 bg-gradient-to-br from-accent/10 via-surface to-brand/10 p-7">
                 <div className="absolute right-5 top-5 chip-pink rounded-full px-2.5 py-0.5 text-[10px] font-bold">
-                  PRO
+                  PRO · STRIPE
                 </div>
                 <div className="text-xs font-bold uppercase tracking-[0.16em] text-accent">
                   Pro
@@ -532,6 +604,7 @@ export function LandingPage() {
                   {t("startPro")}
                 </Link>
                 <p className="mt-3 text-[11px] text-muted">{t("stripeBillingHint")}</p>
+                <p className="mt-1 text-[11px] text-zinc-500">{t("stripeSecureHint")}</p>
               </div>
             </div>
           </div>
