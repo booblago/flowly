@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS lists (
   title TEXT NOT NULL,
   position INTEGER NOT NULL,
   wip_limit INTEGER,
+  default_priority TEXT NOT NULL DEFAULT 'medium',
   accent TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS cards (
@@ -155,6 +156,12 @@ function migrateSchema(database: Database.Database) {
     "email_verify_expires TEXT",
   );
   addColIfMissing(database, "boards", "share_token", "share_token TEXT");
+  addColIfMissing(
+    database,
+    "lists",
+    "default_priority",
+    "default_priority TEXT NOT NULL DEFAULT 'medium'",
+  );
   addColIfMissing(database, "cards", "completed_at", "completed_at TEXT");
   addColIfMissing(database, "cards", "recurrence", "recurrence TEXT");
   addColIfMissing(database, "cards", "next_occur_at", "next_occur_at TEXT");

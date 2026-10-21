@@ -6,6 +6,7 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  TouchSensor,
   closestCorners,
   useSensor,
   useSensors,
@@ -24,24 +25,16 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   Calendar,
   CalendarDays,
-  Check,
-  CheckSquare,
   Plus,
   Search,
   Workflow,
 } from "lucide-react";
 import { format } from "date-fns";
-import type { Activity, Board, Card, List, PublicUser } from "@/lib/types";
-import {
-  PRIORITY_COLORS,
-  cn,
-  daysInList,
-  initials,
-  uid,
-  userImageSrc,
-} from "@/lib/utils";
+import type { Activity, Board, Card, List, Priority, PublicUser } from "@/lib/types";
+import { cn, initials, localDayKey, uid, userImageSrc } from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
 import { CardModal } from "./CardModal";
+import { SortableList } from "./BoardLists";
 
 type Props = {
   board: Board;
@@ -67,6 +60,7 @@ export function BoardView({
   const [cards, setCards] = useState(initialCards);
   const [activities, setActivities] = useState(initialActivities);
   const [activeCard, setActiveCard] = useState<Card | null>(null);
+  const [activeList, setActiveList] = useState<List | null>(null);
   const [selected, setSelected] = useState<Card | null>(null);
   const [query, setQuery] = useState("");
   const [newListTitle, setNewListTitle] = useState("");
@@ -84,8 +78,91 @@ export function BoardView({
     };
   }, []);
 
+  const syncFingerprint = useRef("");
+  const draggingRef = useRef(false);
+  const dragOriginRef = useRef<{
+    cardId: string;
+    listId: string;
+    position: number;
+  } | null>(null);
+  const pendingCompleteRef = useRef<Set<string>>(new Set());
+
+  function mergeActivities(server: Activity[], local: Activity[]): Activity[] {
+    const serverIds = new Set(server.map((a) => a.id));
+    const pending = local.filter((a) => {
+      if (serverIds.has(a.id)) return false;
+      const age = Date.now() - new Date(a.createdAt).getTime();
+      if (age > 25_000) return false;
+      return !server.some(
+        (s) =>
+          s.message === a.message &&
+          Math.abs(
+            new Date(s.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          ) < 30_000,
+      );
+    });
+    return [...pending, ...server].sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    );
+  }
+
+  // Soft live sync — never clobber in-flight drag; merge activities
+  useEffect(() => {
+    let cancelled = false;
+    async function softSync() {
+      try {
+        if (draggingRef.current || pendingCompleteRef.current.size > 0) return;
+        const bundle = await fetch(`/api/boards/${board.id}`).then((r) =>
+          r.json(),
+        );
+        if (cancelled || draggingRef.current) return;
+        const acts = Array.isArray(bundle.activities) ? bundle.activities : null;
+        const nextCards = Array.isArray(bundle.cards) ? bundle.cards : null;
+        const fp = JSON.stringify({
+          a: acts?.map((x: Activity) => x.id) ?? null,
+          c:
+            nextCards?.map(
+              (x: Card) =>
+                `${x.id}:${x.completedAt ?? ""}:${x.listId}:${x.position}:${x.priority}`,
+            ) ?? null,
+        });
+        if (fp === syncFingerprint.current) return;
+        syncFingerprint.current = fp;
+        if (acts) {
+          setActivities((prev) => mergeActivities(acts, prev));
+        }
+        if (nextCards && !draggingRef.current) {
+          setCards(nextCards);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    const id = window.setInterval(softSync, 9000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [board.id]);
+
+  function bumpActivity(message: string) {
+    setActivities((prev) => [
+      {
+        id: uid("act"),
+        boardId: board.id,
+        userId: "me",
+        message,
+        createdAt: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+  }
+
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 150, tolerance: 6 },
+    }),
   );
 
   const filteredCards = useMemo(() => {
@@ -112,7 +189,9 @@ export function BoardView({
   async function refreshBoard() {
     const bundle = await fetch(`/api/boards/${board.id}`).then((r) => r.json());
     if (bundle.cards) setCards(bundle.cards);
-    if (bundle.activities) setActivities(bundle.activities);
+    if (bundle.activities) {
+      setActivities((prev) => mergeActivities(bundle.activities, prev));
+    }
   }
 
   function cancelPendingComplete(cardId: string) {
@@ -126,56 +205,96 @@ export function BoardView({
     });
   }
 
-  function scheduleComplete(cardId: string) {
-    if (completeTimers.current.has(cardId)) return;
-    setCompletingIds((prev) => new Set(prev).add(cardId));
-    setToast("completePending");
-    const timer = setTimeout(() => {
-      completeTimers.current.delete(cardId);
-      void (async () => {
-        const res = await fetch("/api/cards/complete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cardId, complete: true }),
-        });
-        setCompletingIds((prev) => {
-          const next = new Set(prev);
-          next.delete(cardId);
-          return next;
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          flash(data.error || t("completeFailed"));
-          return;
-        }
-        await refreshBoard();
-        flash(t("completeDone"));
-      })();
-    }, 5000);
-    completeTimers.current.set(cardId, timer);
-  }
-
   async function toggleComplete(card: Card) {
-    if (completingIds.has(card.id)) {
-      cancelPendingComplete(card.id);
-      setToast("");
-      return;
-    }
-    if (card.completedAt) {
+    if (completingIds.has(card.id)) return;
+    cancelPendingComplete(card.id);
+    setCompletingIds((prev) => new Set(prev).add(card.id));
+    pendingCompleteRef.current.add(card.id);
+    const complete = !card.completedAt;
+    const prevCompletedAt = card.completedAt;
+    // Optimistic card state only — bump chart after server OK (no phantom / no snap)
+    setCards((prev) =>
+      prev.map((c) =>
+        c.id === card.id
+          ? {
+              ...c,
+              completedAt: complete ? new Date().toISOString() : null,
+            }
+          : c,
+      ),
+    );
+    try {
       const res = await fetch("/api/cards/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cardId: card.id, complete: false }),
+        body: JSON.stringify({ cardId: card.id, complete }),
       });
       if (!res.ok) {
         const data = await res.json();
+        setCards((prev) =>
+          prev.map((c) =>
+            c.id === card.id ? { ...c, completedAt: prevCompletedAt } : c,
+          ),
+        );
         flash(data.error || t("completeFailed"));
         return;
       }
-      await refreshBoard();
+      const data = (await res.json()) as { card?: Card };
+      if (data.card) {
+        setCards((prev) =>
+          prev.map((c) => (c.id === data.card!.id ? data.card! : c)),
+        );
+      }
+      bumpActivity(
+        complete
+          ? `completed card "${card.title}"`
+          : `reopened card "${card.title}"`,
+      );
+      flash(complete ? t("completeDone") : t("markIncomplete"));
+    } finally {
+      pendingCompleteRef.current.delete(card.id);
+      setCompletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(card.id);
+        return next;
+      });
+    }
+  }
+
+  async function removeCard(cardId: string, title: string) {
+    const ok = window.confirm(t("deleteCardConfirm").replace("{name}", title));
+    if (!ok) return;
+    const res = await fetch(`/api/cards/${cardId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      flash(data.error || t("saveFailed"));
       return;
     }
-    scheduleComplete(card.id);
+    setCards((prev) => prev.filter((c) => c.id !== cardId));
+    if (selected?.id === cardId) setSelected(null);
+    bumpActivity(`deleted card "${title}"`);
+  }
+
+  async function moveCardToList(cardId: string, listId: string) {
+    const card = cards.find((c) => c.id === cardId);
+    const listCards = cards
+      .filter((c) => c.listId === listId && c.id !== cardId)
+      .sort((a, b) => a.position - b.position);
+    const position = listCards.length;
+    setCards((prev) =>
+      prev.map((c) =>
+        c.id === cardId
+          ? {
+              ...c,
+              listId,
+              position,
+              enteredListAt: new Date().toISOString(),
+            }
+          : c,
+      ),
+    );
+    if (card) bumpActivity(`moved card "${card.title}"`);
+    await persistMove(cardId, listId, position);
   }
 
   async function persistMove(cardId: string, listId: string, position: number) {
@@ -192,31 +311,63 @@ export function BoardView({
       if (bundle.activities) setActivities(bundle.activities);
       return;
     }
-    const bundle = await fetch(`/api/boards/${board.id}`).then((r) => r.json());
-    if (bundle.cards) setCards(bundle.cards);
-    if (bundle.activities) setActivities(bundle.activities);
+    if (data.card) {
+      setCards((prev) =>
+        prev.map((c) => (c.id === cardId ? { ...c, ...data.card } : c)),
+      );
+    }
+  }
+
+  function resolveListId(overId: string): string | null {
+    if (overId.startsWith("drop-")) return overId.slice(5);
+    if (lists.some((l) => l.id === overId)) return overId;
+    const card = cards.find((c) => c.id === overId);
+    return card?.listId ?? null;
   }
 
   function onDragStart(event: DragStartEvent) {
-    const card = cards.find((c) => c.id === event.active.id);
-    if (card) setActiveCard(card);
+    draggingRef.current = true;
+    const id = String(event.active.id);
+    const list = lists.find((l) => l.id === id);
+    if (list) {
+      setActiveList(list);
+      setActiveCard(null);
+      dragOriginRef.current = null;
+      return;
+    }
+    const card = cards.find((c) => c.id === id);
+    if (card) {
+      setActiveCard(card);
+      setActiveList(null);
+      dragOriginRef.current = {
+        cardId: card.id,
+        listId: card.listId,
+        position: card.position,
+      };
+    }
   }
 
   function onDragOver(event: DragOverEvent) {
     const { active, over } = event;
     if (!over) return;
     const activeId = String(active.id);
+    if (lists.some((l) => l.id === activeId)) return;
     const overId = String(over.id);
-    const activeCardItem = cards.find((c) => c.id === activeId);
-    if (!activeCardItem) return;
-
-    const overList =
-      lists.find((l) => l.id === overId) ||
-      lists.find((l) => l.id === cards.find((c) => c.id === overId)?.listId);
-    if (!overList) return;
-    if (activeCardItem.listId === overList.id) return;
 
     setCards((prev) => {
+      const activeCardItem = prev.find((c) => c.id === activeId);
+      if (!activeCardItem) return prev;
+
+      const dropListId = overId.startsWith("drop-") ? overId.slice(5) : overId;
+      const overList =
+        lists.find((l) => l.id === dropListId) ||
+        lists.find((l) => l.id === overId) ||
+        lists.find(
+          (l) => l.id === prev.find((c) => c.id === overId)?.listId,
+        );
+      if (!overList) return prev;
+      if (activeCardItem.listId === overList.id) return prev;
+
       const without = prev.filter((c) => c.id !== activeId);
       const overCards = without
         .filter((c) => c.listId === overList.id)
@@ -229,11 +380,11 @@ export function BoardView({
         position: insertAt,
         enteredListAt: new Date().toISOString(),
       };
-      const nextOver = [...overCards];
-      nextOver.splice(insertAt, 0, moved);
-      nextOver.forEach((c, i) => {
-        c.position = i;
-      });
+      const nextOver = [
+        ...overCards.slice(0, insertAt),
+        moved,
+        ...overCards.slice(insertAt),
+      ].map((c, i) => ({ ...c, position: i }));
       const others = without.filter((c) => c.listId !== overList.id);
       return [...others, ...nextOver];
     });
@@ -241,40 +392,52 @@ export function BoardView({
 
   async function onDragEnd(event: DragEndEvent) {
     const { active, over } = event;
+    const origin = dragOriginRef.current;
+    draggingRef.current = false;
     setActiveCard(null);
+    setActiveList(null);
+    dragOriginRef.current = null;
     if (!over) return;
 
     const activeId = String(active.id);
     const overId = String(over.id);
 
     if (lists.some((l) => l.id === activeId)) {
-      if (lists.some((l) => l.id === overId)) {
-        const oldIndex = lists.findIndex((l) => l.id === activeId);
-        const newIndex = lists.findIndex((l) => l.id === overId);
-        if (oldIndex !== newIndex) {
-          const next = arrayMove(lists, oldIndex, newIndex).map((l, i) => ({
-            ...l,
-            position: i,
-          }));
-          setLists(next);
-          await fetch("/api/lists", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              boardId: board.id,
-              orderedIds: next.map((l) => l.id),
-            }),
-          });
+      const targetListId = resolveListId(overId);
+      if (!targetListId || targetListId === activeId) return;
+      const oldIndex = lists.findIndex((l) => l.id === activeId);
+      const newIndex = lists.findIndex((l) => l.id === targetListId);
+      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+      const next = arrayMove(lists, oldIndex, newIndex).map((l, i) => ({
+        ...l,
+        position: i,
+      }));
+      setLists(next);
+      bumpActivity("reordered lists");
+      void fetch("/api/lists", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          boardId: board.id,
+          orderedIds: next.map((l) => l.id),
+        }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          flash(t("saveFailed"));
+          const bundle = await fetch(`/api/boards/${board.id}`).then((r) =>
+            r.json(),
+          );
+          if (bundle.lists) setLists(bundle.lists);
         }
-      }
+      });
       return;
     }
 
     const card = cards.find((c) => c.id === activeId);
     if (!card) return;
-    const overList =
-      lists.find((l) => l.id === overId) ||
-      lists.find((l) => l.id === cards.find((c) => c.id === overId)?.listId);
+    const targetListId = resolveListId(overId);
+    if (!targetListId) return;
+    const overList = lists.find((l) => l.id === targetListId);
     if (!overList) return;
 
     const listCards = cards
@@ -282,7 +445,15 @@ export function BoardView({
       .sort((a, b) => a.position - b.position);
     const oldIndex = listCards.findIndex((c) => c.id === activeId);
     let newIndex = listCards.findIndex((c) => c.id === overId);
-    if (newIndex < 0) newIndex = listCards.length - 1;
+    if (newIndex < 0) newIndex = Math.max(listCards.length - 1, 0);
+
+    const changed =
+      !origin ||
+      origin.listId !== overList.id ||
+      origin.position !== Math.max(newIndex, 0);
+
+    if (!changed) return;
+
     if (oldIndex !== newIndex && oldIndex >= 0) {
       const reordered = arrayMove(listCards, oldIndex, newIndex).map((c, i) => ({
         ...c,
@@ -293,10 +464,9 @@ export function BoardView({
         ...prev.filter((c) => c.listId !== overList.id),
         ...reordered,
       ]);
-      await persistMove(activeId, overList.id, newIndex);
-    } else {
-      await persistMove(activeId, overList.id, Math.max(newIndex, 0));
     }
+    bumpActivity(`moved card "${card.title}"`);
+    void persistMove(activeId, overList.id, Math.max(newIndex, 0));
   }
 
   async function addCard(listId: string, title: string) {
@@ -326,22 +496,49 @@ export function BoardView({
   }
 
   async function addList() {
-    if (!newListTitle.trim()) return;
+    const title = newListTitle.trim();
+    if (!title) {
+      flash(t("boardNameRequired"));
+      return;
+    }
     const res = await fetch("/api/lists", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ boardId: board.id, title: newListTitle.trim() }),
+      body: JSON.stringify({ boardId: board.id, title }),
     });
-    const data = await res.json();
-    if (data.list) {
-      setLists((prev) => [...prev, data.list]);
-      setNewListTitle("");
+    const data = (await res.json().catch(() => ({}))) as {
+      list?: List;
+      error?: string;
+    };
+    if (!res.ok || !data.list) {
+      flash(data.error || t("saveFailed"));
+      return;
     }
+    setLists((prev) => [...prev, data.list!]);
+    setNewListTitle("");
+    bumpActivity(`added list "${title}"`);
+  }
+
+  async function removeList(listId: string, title: string) {
+    const ok = window.confirm(
+      t("deleteListConfirm").replace("{name}", title),
+    );
+    if (!ok) return;
+    const res = await fetch(`/api/lists/${listId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      setToast(data.error || t("saveFailed"));
+      return;
+    }
+    setLists((prev) => prev.filter((l) => l.id !== listId));
+    setCards((prev) => prev.filter((c) => c.listId !== listId));
+    bumpActivity(`deleted list "${title}"`);
   }
 
   async function saveCard(next: Card) {
     setCards((prev) => prev.map((c) => (c.id === next.id ? next : c)));
     setSelected(next);
+    bumpActivity(`updated card "${next.title}"`);
     await fetch(`/api/cards/${next.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -349,16 +546,66 @@ export function BoardView({
     });
   }
 
-  async function setWip(listId: string, wipLimit: number | null) {
+  async function setDefaultPriority(listId: string, defaultPriority: Priority) {
+    setLists((prev) =>
+      prev.map((l) => (l.id === listId ? { ...l, defaultPriority } : l)),
+    );
+    const list = lists.find((l) => l.id === listId);
+    bumpActivity(`changed default priority on "${list?.title ?? "list"}"`);
     const res = await fetch(`/api/lists/${listId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wipLimit }),
+      body: JSON.stringify({ defaultPriority }),
     });
     const data = await res.json();
     if (data.list) {
       setLists((prev) => prev.map((l) => (l.id === listId ? data.list : l)));
     }
+  }
+
+  async function setCardPriority(cardId: string, priority: Priority) {
+    const card = cards.find((c) => c.id === cardId);
+    setCards((prev) =>
+      prev.map((c) => (c.id === cardId ? { ...c, priority } : c)),
+    );
+    if (selected?.id === cardId) {
+      setSelected({ ...selected, priority });
+    }
+    bumpActivity(`updated card "${card?.title ?? "card"}"`);
+    await fetch(`/api/cards/${cardId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ priority }),
+    });
+  }
+
+  async function renameList(listId: string, title: string) {
+    const prev = lists.find((l) => l.id === listId)?.title;
+    setLists((curr) =>
+      curr.map((l) => (l.id === listId ? { ...l, title } : l)),
+    );
+    const res = await fetch(`/api/lists/${listId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      list?: List;
+      error?: string;
+    };
+    if (!res.ok || !data.list) {
+      if (prev != null) {
+        setLists((curr) =>
+          curr.map((l) => (l.id === listId ? { ...l, title: prev } : l)),
+        );
+      }
+      flash(data.error || t("saveFailed"));
+      return;
+    }
+    setLists((curr) =>
+      curr.map((l) => (l.id === listId ? data.list! : l)),
+    );
+    bumpActivity(`renamed list to "${title}"`);
   }
 
   return (
@@ -454,79 +701,153 @@ export function BoardView({
 
       <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
         <div className="board-canvas overflow-hidden rounded-[28px] p-4">
-          <DndContext
-            id={dndId}
-            sensors={sensors}
-            collisionDetection={closestCorners}
-            onDragStart={onDragStart}
-            onDragOver={onDragOver}
-            onDragEnd={onDragEnd}
-          >
-            <SortableContext
-              items={lists.map((l) => l.id)}
-              strategy={horizontalListSortingStrategy}
+          <div className="scrollbar-thin flex items-start gap-3 overflow-x-auto pb-2">
+            <DndContext
+              id={dndId}
+              sensors={sensors}
+              collisionDetection={closestCorners}
+              onDragStart={onDragStart}
+              onDragOver={onDragOver}
+              onDragEnd={onDragEnd}
             >
-              <div className="scrollbar-thin flex items-start gap-3 overflow-x-auto pb-2">
-                {lists.map((list) => (
-                  <SortableList
-                    key={list.id}
-                    list={list}
-                    cards={cardsInList(list.id)}
-                    board={board}
-                    completingIds={completingIds}
-                    onAddCard={addCard}
-                    onOpenCard={setSelected}
-                    onSetWip={setWip}
-                    onToggleComplete={toggleComplete}
-                  />
-                ))}
-                <div className="w-72 shrink-0 rounded-2xl border border-[var(--line)] bg-surface/60 p-3">
-                  <input
-                    value={newListTitle}
-                    onChange={(e) => setNewListTitle(e.target.value)}
-                    placeholder={t("newListTitle")}
-                    className="w-full rounded-xl border border-[var(--line)] bg-paper px-3 py-2 text-sm outline-none"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void addList();
-                    }}
-                  />
-                  <button
-                    onClick={() => void addList()}
-                    className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand"
+              <SortableContext
+                items={lists.map((l) => l.id)}
+                strategy={horizontalListSortingStrategy}
+              >
+                <div className="flex items-start gap-3">
+                  {lists.map((list) => (
+                    <SortableList
+                      key={list.id}
+                      list={list}
+                      cards={cardsInList(list.id)}
+                      allLists={lists}
+                      board={board}
+                      completingIds={completingIds}
+                      onAddCard={addCard}
+                      onOpenCard={setSelected}
+                      onSetDefaultPriority={setDefaultPriority}
+                      onSetCardPriority={setCardPriority}
+                      onRenameList={renameList}
+                      onToggleComplete={toggleComplete}
+                      onDeleteList={() => void removeList(list.id, list.title)}
+                      onDeleteCard={(card) =>
+                        void removeCard(card.id, card.title)
+                      }
+                      onMoveCard={(cardId, listId) =>
+                        void moveCardToList(cardId, listId)
+                      }
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+              <DragOverlay dropAnimation={null}>
+                {activeList ? (
+                  <div
+                    className="w-72 rounded-2xl border border-t-2 border-white/20 bg-surface p-3 shadow-2xl"
+                    style={{ borderTopColor: activeList.accent }}
                   >
-                    <Plus className="h-4 w-4" /> {t("addList")}
-                  </button>
-                </div>
-              </div>
-            </SortableContext>
-            <DragOverlay>
-              {activeCard ? (
-                <div className="w-64 rounded-2xl border border-brand/40 bg-surface p-3 shadow-2xl">
-                  <div className="text-sm font-semibold">{activeCard.title}</div>
-                </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
+                    <div
+                      className="text-sm font-semibold"
+                      style={{ color: activeList.accent }}
+                    >
+                      {activeList.title}
+                    </div>
+                    <div className="mt-2 h-16 rounded-xl bg-black/30" />
+                  </div>
+                ) : activeCard ? (
+                  <div className="w-64 rounded-2xl border border-brand/40 bg-[#111113] p-3 shadow-2xl">
+                    <div className="text-sm font-semibold text-white">
+                      {activeCard.title}
+                    </div>
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+
+            {/* Outside DnD so clicks always work */}
+            <form
+              className="relative z-20 w-56 shrink-0 rounded-xl border border-dashed border-white/20 bg-black/40 p-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void addList();
+              }}
+            >
+              {lists.length === 0 && (
+                <p className="mb-1.5 px-0.5 text-[11px] text-muted">
+                  {t("emptyBoardHint")}
+                </p>
+              )}
+              <input
+                value={newListTitle}
+                onChange={(e) => setNewListTitle(e.target.value)}
+                placeholder={t("newListTitle")}
+                className="w-full rounded-lg border border-white/15 bg-[#111113] px-2.5 py-1.5 text-xs text-white outline-none ring-brand focus:ring-1"
+              />
+              <button
+                type="submit"
+                className="mt-1.5 inline-flex w-full items-center justify-center gap-1 rounded-lg bg-white px-2 py-1.5 text-xs font-semibold text-black hover:bg-zinc-100"
+              >
+                <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+                {t("addList")}
+              </button>
+            </form>
+          </div>
         </div>
 
-        <aside className="rounded-[28px] border border-[var(--line)] bg-surface p-4">
-          <h2 className="font-display text-lg font-bold">{t("activity")}</h2>
-          <div className="mt-3 space-y-3">
-            {activities.slice(0, 12).map((a) => {
-              const user = members.find((m) => m.id === a.userId);
-              const isAuto = a.message.includes("automation");
-              return (
-                <div key={a.id} className="text-sm">
-                  <span className={isAuto ? "text-accent" : "font-semibold"}>
-                    {isAuto ? "⚡" : user?.name || t("someone")}
-                  </span>{" "}
-                  <span className="text-muted">{a.message}</span>
-                  <div className="text-[11px] text-muted">
-                    {format(new Date(a.createdAt), "MMM d · HH:mm")}
+        <aside className="flex max-h-[min(70vh,640px)] flex-col rounded-[28px] border border-[var(--line)] bg-surface p-3">
+          <h2 className="font-display text-base font-bold">
+            {t("boardActivityChart")}
+          </h2>
+          <p className="mt-0.5 text-[11px] text-muted">{t("boardActivityChartHint")}</p>
+
+          <BoardPulseChart
+            activities={activities}
+            cards={cards}
+            lists={lists}
+            labels={{
+              actions: t("chartActions"),
+              open: t("chartOpenCards"),
+              done: t("done"),
+              active: t("pulseActive"),
+              quiet: t("pulseQuiet"),
+            }}
+          />
+
+          <div className="mt-3 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              {t("activity")}
+            </h3>
+            <span className="text-[10px] text-zinc-600">{t("scrollForMore")}</span>
+          </div>
+          <div className="mt-1.5 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+            {activities.length === 0 ? (
+              <p className="py-2 text-xs text-muted">{t("nothingHere")}</p>
+            ) : (
+              activities.map((a) => {
+                const user = members.find((m) => m.id === a.userId);
+                const isAuto = a.message.includes("automation");
+                return (
+                  <div
+                    key={a.id}
+                    className="rounded-lg border border-white/5 bg-black/20 px-2 py-1.5 text-[11px] leading-snug"
+                  >
+                    <div>
+                      <span
+                        className={
+                          isAuto ? "text-accent" : "font-semibold text-zinc-200"
+                        }
+                      >
+                        {isAuto ? "⚡" : user?.name || t("someone")}
+                      </span>{" "}
+                      <span className="text-zinc-500">{a.message}</span>
+                    </div>
+                    <div className="mt-0.5 text-[10px] text-zinc-600">
+                      {format(new Date(a.createdAt), "MMM d · HH:mm")}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </aside>
       </div>
@@ -536,269 +857,184 @@ export function BoardView({
           card={selected}
           board={board}
           members={members}
+          lists={lists}
           onClose={() => setSelected(null)}
           onSave={saveCard}
+          onDelete={() => void removeCard(selected.id, selected.title)}
+          onMove={(listId) => void moveCardToList(selected.id, listId)}
         />
       )}
     </div>
   );
 }
 
-function SortableList({
-  list,
+function BoardPulseChart({
+  activities,
   cards,
-  board,
-  completingIds,
-  onAddCard,
-  onOpenCard,
-  onSetWip,
-  onToggleComplete,
+  lists,
+  labels,
 }: {
-  list: List;
+  activities: Activity[];
   cards: Card[];
-  board: Board;
-  completingIds: Set<string>;
-  onAddCard: (listId: string, title: string) => Promise<void>;
-  onOpenCard: (card: Card) => void;
-  onSetWip: (listId: string, wip: number | null) => Promise<void>;
-  onToggleComplete: (card: Card) => void;
+  lists: List[];
+  labels: {
+    actions: string;
+    open: string;
+    done: string;
+    active: string;
+    quiet: string;
+  };
 }) {
-  const t = useT();
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: list.id, data: { type: "list" } });
-  const [title, setTitle] = useState("");
-  const atLimit = list.wipLimit != null && cards.length >= list.wipLimit;
+  const days = useMemo(() => {
+    const out: { key: string; label: string; count: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setHours(12, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      out.push({
+        key: localDayKey(d),
+        label: format(d, "EE").slice(0, 2),
+        count: 0,
+      });
+    }
+    for (const a of activities) {
+      const key = localDayKey(a.createdAt);
+      const row = out.find((x) => x.key === key);
+      if (row) row.count += 1;
+    }
+    return out;
+  }, [activities]);
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-        borderTopColor: list.accent,
-      }}
-      className="w-72 shrink-0 rounded-2xl border border-[var(--line)] border-t-2 bg-surface/70 p-2.5 backdrop-blur-md"
-    >
-      <div className="mb-2 flex items-start justify-between gap-2 px-1">
-        <div
-          className="cursor-grab active:cursor-grabbing"
-          {...attributes}
-          {...listeners}
-        >
-          <div className="text-sm font-semibold" style={{ color: list.accent }}>
-            {list.title}
-            <span className="ml-2 text-muted">{cards.length}</span>
-            {list.wipLimit != null && (
-              <span className={cn("ml-1 text-xs", atLimit ? "text-rose" : "text-muted")}>
-                / {list.wipLimit}
-              </span>
-            )}
-          </div>
-        </div>
-        <button
-          onClick={() => {
-            const raw = window.prompt(
-              t("wipPrompt"),
-              list.wipLimit?.toString() ?? "",
-            );
-            if (raw === null) return;
-            const n = raw.trim() === "" ? null : Number(raw);
-            void onSetWip(list.id, Number.isFinite(n as number) ? (n as number) : null);
-          }}
-          className="text-[10px] font-semibold uppercase text-muted hover:text-amber"
-        >
-          WIP
-        </button>
-      </div>
-      {atLimit && (
-        <div className="mb-2 rounded-lg bg-rose/10 px-2 py-1 text-[11px] font-medium text-rose">
-          {t("wipLimitReached")}
-        </div>
-      )}
-      <SortableContext
-        items={cards.map((c) => c.id)}
-        strategy={verticalListSortingStrategy}
-      >
-        <div className="list-gap space-y-2">
-          {cards.map((card) => (
-            <SortableCard
-              key={card.id}
-              card={card}
-              board={board}
-              pendingComplete={completingIds.has(card.id)}
-              onOpen={() => onOpenCard(card)}
-              onToggleComplete={() => onToggleComplete(card)}
-            />
-          ))}
-        </div>
-      </SortableContext>
-      <div className="mt-2">
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder={atLimit ? t("wipFull") : t("addCard")}
-          disabled={atLimit}
-          className="card-pad w-full rounded-xl border border-[var(--line)] bg-paper px-3 py-2 text-sm outline-none disabled:opacity-40"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && title.trim()) {
-              void onAddCard(list.id, title.trim());
-              setTitle("");
-            }
-          }}
-        />
-      </div>
-    </div>
+  const doneCount = cards.filter((c) => c.completedAt).length;
+  const openCount = Math.max(cards.length - doneCount, 0);
+  const listMax = Math.max(
+    ...lists.map((l) => cards.filter((c) => c.listId === l.id).length),
+    1,
   );
-}
-
-function SortableCard({
-  card,
-  board,
-  pendingComplete,
-  onOpen,
-  onToggleComplete,
-}: {
-  card: Card;
-  board: Board;
-  pendingComplete: boolean;
-  onOpen: () => void;
-  onToggleComplete: () => void;
-}) {
-  const t = useT();
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: card.id, data: { type: "card" } });
-  const done = card.checklist.filter((i) => i.done).length;
-  const total = card.checklist.length;
-  const labels = board.labels.filter((l) => card.labelIds.includes(l.id));
-  const age = daysInList(card.enteredListAt);
-  const slaRisk = age >= board.slaDays && !card.completedAt && !pendingComplete;
-  const dueSoon =
-    card.dueDate &&
-    new Date(card.dueDate).getTime() - Date.now() < 2 * 24 * 60 * 60 * 1000 &&
-    new Date(card.dueDate).getTime() >= Date.now();
-  const overdue =
-    card.dueDate && new Date(card.dueDate).getTime() < Date.now();
-  const showMeta = Boolean(card.dueDate) || total > 0 || slaRisk;
-  const checked = Boolean(card.completedAt) || pendingComplete;
+  const barMaxH = 72;
+  // Soft asymptotic scale — every action nudges the bar up a little, never jumps
+  const countSig = days.map((d) => d.count).join(",");
+  const targetHeights = useMemo(
+    () =>
+      countSig.split(",").map((raw) => {
+        const n = Number(raw) || 0;
+        if (n <= 0) return 6;
+        // Slow curve so busy days still creep up gently on each action
+        const t = 1 - Math.exp(-n / 26);
+        return Math.max(10, Math.round((6 + t * (barMaxH - 6)) * 10) / 10);
+      }),
+    [countSig],
+  );
 
   return (
-    <div
-      ref={setNodeRef}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.4 : 1,
-      }}
-      className={cn(
-        "card-lift card-pad group relative w-full overflow-hidden rounded-xl border border-[var(--line)] bg-paper py-3 pl-3.5 pr-3 text-left",
-        slaRisk && "border-rose/40",
-        pendingComplete && "border-brand/40 bg-brand/5",
-        card.completedAt && "opacity-80",
-      )}
-    >
-      <span
-        className="absolute inset-y-2 left-0 w-[3px] rounded-full"
-        style={{ background: PRIORITY_COLORS[card.priority] }}
-        aria-hidden
-      />
+    <div className="mt-2 space-y-2.5">
+      <div className="rounded-2xl border border-[var(--line)] bg-paper/40 p-3">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-[11px] font-medium text-zinc-400">
+            {labels.actions}
+          </span>
+          <span className="rounded-md bg-black/30 px-1.5 py-0.5 text-[10px] text-zinc-500">
+            7d
+          </span>
+        </div>
 
-      <div className="flex items-start gap-2">
-        <button
-          type="button"
-          aria-label={checked ? t("markIncomplete") : t("markComplete")}
-          title={checked ? t("markIncomplete") : t("markComplete")}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleComplete();
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className={cn(
-            "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition",
-            checked
-              ? "border-brand bg-brand text-black"
-              : "border-zinc-500 text-transparent hover:border-brand hover:text-brand/40",
-          )}
-        >
-          <Check className="h-3 w-3" strokeWidth={3} />
-        </button>
-
-        <button
-          type="button"
-          className="min-w-0 flex-1 text-left"
-          onClick={onOpen}
-          title={`${t("priority")}: ${t(card.priority)}`}
-          {...attributes}
-          {...listeners}
-        >
-          {labels.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-1">
-              {labels.slice(0, 4).map((l) => (
-                <span
-                  key={l.id}
-                  className="h-1 w-7 rounded-full"
-                  style={{ background: l.color }}
-                  title={l.name}
+        <div className="flex items-end gap-1.5" style={{ height: barMaxH + 4 }}>
+          {days.map((d, i) => {
+            const active = d.count > 0;
+            const h = Math.max(6, targetHeights[i] ?? 6);
+            const green = Math.min(0.92, 0.28 + d.count * 0.06);
+            return (
+              <div
+                key={d.key}
+                className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1"
+                title={`${d.label}: ${d.count}`}
+              >
+                <div
+                  className="w-full max-w-[28px] rounded-t-lg rounded-b-sm"
+                  style={{
+                    height: h,
+                    background: active
+                      ? `linear-gradient(to top, rgba(5,150,105,${green}) 0%, rgba(52,211,153,${green}) 100%)`
+                      : "rgba(244, 63, 94, 0.32)",
+                    transition:
+                      "height 1.8s cubic-bezier(0.16, 1, 0.3, 1), background 1.2s ease",
+                  }}
                 />
-              ))}
-            </div>
-          )}
-
-          <div
-            className={cn(
-              "text-sm font-semibold leading-snug text-ink",
-              checked && "text-muted line-through decoration-zinc-500",
-            )}
-          >
-            {card.title}
-          </div>
-
-          {pendingComplete && (
-            <div className="mt-1.5 text-[11px] font-medium text-brand">
-              {t("movingToDone")}
-            </div>
-          )}
-
-          {showMeta && !pendingComplete && (
-            <div className="mt-2.5 flex items-center gap-3 text-[11px] text-muted">
-              {card.dueDate && (
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1",
-                    overdue && !checked && "font-medium text-rose",
-                    dueSoon && !overdue && !checked && "font-medium text-amber",
-                  )}
-                >
-                  <Calendar className="h-3 w-3 shrink-0 opacity-70" />
-                  {format(new Date(card.dueDate), "MMM d")}
+                <span className="text-[9px] font-medium text-zinc-500">
+                  {d.label}
                 </span>
-              )}
-              {total > 0 && (
-                <span className="inline-flex items-center gap-1.5">
-                  <CheckSquare className="h-3 w-3 shrink-0 opacity-70" />
-                  <span
-                    className="h-1 w-10 overflow-hidden rounded-full bg-white/10"
-                    aria-hidden
-                  >
-                    <span
-                      className="block h-full rounded-full bg-brand"
-                      style={{ width: `${Math.round((done / total) * 100)}%` }}
-                    />
-                  </span>
-                  <span className="tabular-nums">
-                    {done}/{total}
-                  </span>
-                </span>
-              )}
-              {slaRisk && (
-                <span className="ml-auto font-medium text-rose" title={t("slaBreach")}>
-                  {age}d
-                </span>
-              )}
-            </div>
-          )}
-        </button>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 flex items-center gap-3 border-t border-white/5 pt-2 text-[9px] text-zinc-500">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            {labels.active}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-rose-500/60" />
+            {labels.quiet}
+          </span>
+        </div>
       </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-2xl border border-[var(--line)] bg-paper/40 px-3 py-2.5">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted">
+            {labels.open}
+          </div>
+          <div className="mt-0.5 font-display text-2xl font-bold text-brand transition-all duration-500">
+            {openCount}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-[var(--line)] bg-paper/40 px-3 py-2.5">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted">
+            {labels.done}
+          </div>
+          <div className="mt-0.5 font-display text-2xl font-bold text-lime transition-all duration-500">
+            {doneCount}
+          </div>
+        </div>
+      </div>
+
+      {lists.length > 0 && (
+        <div className="space-y-2 rounded-2xl border border-[var(--line)] bg-paper/40 px-3 py-2.5">
+          {lists.map((l) => {
+            const n = cards.filter((c) => c.listId === l.id).length;
+            const active = n > 0;
+            return (
+              <div key={l.id} className="flex items-center gap-2">
+                <span
+                  className="w-14 truncate text-[11px] font-medium"
+                  style={{ color: l.accent }}
+                >
+                  {l.title}
+                </span>
+                <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-black/35">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: active
+                        ? `${Math.max(10, Math.round((n / listMax) * 100))}%`
+                        : "12%",
+                      background: active
+                        ? l.accent
+                        : "rgba(244, 63, 94, 0.4)",
+                      transition:
+                        "width 1.6s cubic-bezier(0.16, 1, 0.3, 1), background 1s ease",
+                    }}
+                  />
+                </div>
+                <span className="w-4 text-right text-[11px] tabular-nums text-zinc-500 transition-all duration-500">
+                  {n}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

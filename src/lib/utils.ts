@@ -9,6 +9,16 @@ export function uid(prefix = "id") {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-4)}`;
 }
 
+/** Local calendar day key (YYYY-MM-DD) — avoids UTC off-by-one in charts */
+export function localDayKey(input: Date | string = new Date()) {
+  const d = typeof input === "string" ? new Date(input) : input;
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function priorityScore(priority: Priority): number {
   const map: Record<Priority, number> = {
     low: 1,
@@ -41,6 +51,15 @@ export function userImageSrc(user: {
   return { kind: "color" as const, value: user.avatarColor || "#22d3ee" };
 }
 
+export const PRIORITIES: Priority[] = ["low", "medium", "high", "urgent"];
+
+export const PRIORITY_CODES: Record<Priority, string> = {
+  low: "LOW",
+  medium: "MED",
+  high: "HIG",
+  urgent: "URG",
+};
+
 export const PRIORITY_STYLES: Record<Priority, string> = {
   low: "chip-cyan",
   medium: "chip-violet",
@@ -54,6 +73,11 @@ export const PRIORITY_COLORS: Record<Priority, string> = {
   high: "#fbbf24",
   urgent: "#fb7185",
 };
+
+export function nextPriority(current: Priority): Priority {
+  const i = PRIORITIES.indexOf(current);
+  return PRIORITIES[(i + 1) % PRIORITIES.length];
+}
 
 export const LIST_ACCENTS = ["#22d3ee", "#f472b6", "#a3e635", "#fbbf24", "#a78bfa", "#fb7185"];
 

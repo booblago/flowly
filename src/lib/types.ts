@@ -100,6 +100,8 @@ export interface List {
   title: string;
   position: number;
   wipLimit: number | null;
+  /** Default priority for new cards in this list */
+  defaultPriority: Priority;
   accent: string;
 }
 

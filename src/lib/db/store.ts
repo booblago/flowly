@@ -121,6 +121,7 @@ export async function loadFromSqlite(): Promise<AppDatabase> {
       title: r.title,
       position: r.position,
       wipLimit: r.wipLimit ?? null,
+      defaultPriority: (r.defaultPriority as List["defaultPriority"]) || "medium",
       accent: r.accent,
     }),
   );
@@ -295,6 +296,7 @@ export async function saveToSqlite(data: AppDatabase) {
             title: l.title,
             position: l.position,
             wipLimit: l.wipLimit,
+            defaultPriority: l.defaultPriority ?? "medium",
             accent: l.accent,
           })),
         )

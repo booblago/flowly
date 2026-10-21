@@ -46,6 +46,7 @@
 html,
 body {
   min-height: 100%;
+  color-scheme: dark;
 }
 
 body {
@@ -53,6 +54,40 @@ body {
   color: var(--ink);
   background: var(--paper);
   font-family: var(--font-body), system-ui, sans-serif;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+/* Dark, thin scrollbars — no Windows-white track */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(103, 232, 249, 0.45);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 h1,
@@ -98,12 +133,10 @@ h3,
 
 .neon-cyan {
   color: #67e8f9;
-  text-shadow: 0 0 18px rgba(34, 211, 238, 0.45);
 }
 
 .neon-pink {
   color: #f9a8d4;
-  text-shadow: 0 0 18px rgba(244, 114, 182, 0.45);
 }
 
 /* High-contrast chips: bright fill + dark text so labels never blend into black UI */
@@ -174,14 +207,27 @@ h3,
   animation: rise 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
 .scrollbar-thin::-webkit-scrollbar {
-  height: 8px;
-  width: 8px;
+  height: 6px;
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 999px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(103, 232, 249, 0.45);
 }
 
 input,
@@ -525,4 +571,43 @@ select {
 
 .float-soft {
   animation: float-soft 5.5s ease-in-out infinite;
+}
+
+/* Neat black outline — titles only, not every number/counter */
+h1,
+h2,
+h3 {
+  -webkit-text-stroke: 0 !important;
+  filter: none !important;
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000,
+    -1px 0 0 #000,
+    1px 0 0 #000,
+    0 -1px 0 #000,
+    0 1px 0 #000 !important;
+}
+
+.neon-cyan {
+  color: #67e8f9;
+  -webkit-text-stroke: 0 !important;
+  filter: none !important;
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000 !important;
+}
+
+.neon-pink {
+  color: #f9a8d4;
+  -webkit-text-stroke: 0 !important;
+  filter: none !important;
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000 !important;
 }

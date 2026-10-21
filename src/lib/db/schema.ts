@@ -48,6 +48,7 @@ export const lists = sqliteTable("lists", {
   title: text("title").notNull(),
   position: integer("position").notNull(),
   wipLimit: integer("wip_limit"),
+  defaultPriority: text("default_priority").notNull().default("medium"),
   accent: text("accent").notNull(),
 });
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
-import { updateCard } from "@/lib/db";
+import { deleteCard, updateCard } from "@/lib/db";
 import type { Priority } from "@/lib/types";
 
 const patchSchema = z.object({
@@ -61,6 +61,26 @@ export async function PATCH(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed";
     const status = message === "Forbidden" ? 403 : 400;
+    return NextResponse.json({ error: message }, { status });
+  }
+}
+
+export async function DELETE(
+  _req: Request,
+  context: { params: Promise<{ cardId: string }> },
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { cardId } = await context.params;
+  try {
+    await deleteCard(cardId, session.user.id);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed";
+    const status =
+      message === "Forbidden" ? 403 : message === "Not found" ? 404 : 400;
     return NextResponse.json({ error: message }, { status });
   }
 }

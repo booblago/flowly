@@ -3,8 +3,10 @@ import { auth } from "@/lib/auth";
 import {
   ensureSessionUser,
   getBoardsForUser,
+  getUserPlan,
   getWorkspacesForUser,
 } from "@/lib/db";
+import { planLimits } from "@/lib/plans";
 import { AppShell } from "@/components/app/AppShell";
 import { DashboardView } from "@/components/app/DashboardView";
 
@@ -18,14 +20,19 @@ export default async function DashboardPage() {
     email: session.user.email,
   });
 
-  const [boards, workspaces] = await Promise.all([
+  const [boards, workspaces, plan] = await Promise.all([
     getBoardsForUser(session.user.id),
     getWorkspacesForUser(session.user.id),
+    getUserPlan(session.user.id),
   ]);
 
   return (
     <AppShell>
-      <DashboardView boards={boards} workspaceId={workspaces[0]?.id} />
+      <DashboardView
+        boards={boards}
+        workspaceId={workspaces[0]?.id}
+        maxBoards={planLimits(plan).boards}
+      />
     </AppShell>
   );
 }

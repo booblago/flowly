@@ -14,7 +14,7 @@ export const PLAN_LIMITS = {
     allowWorkload: false,
   },
   pro: {
-    boards: Infinity,
+    boards: 20,
     automationRulesPerBoard: Infinity,
     maxActionsPerRule: 10,
     membersPerWorkspace: 15,

@@ -85,6 +85,7 @@ function migrate(db: Database): Database {
   db.lists = db.lists.map((l, i) => ({
     ...l,
     wipLimit: l.wipLimit ?? null,
+    defaultPriority: l.defaultPriority ?? "medium",
     accent: l.accent ?? LIST_ACCENTS[i % LIST_ACCENTS.length],
   }));
   db.cards = db.cards.map((c) => {
@@ -115,12 +116,14 @@ export async function getUserPlan(userId: string): Promise<PlanId> {
 }
 
 export async function setUserPlan(userId: string, plan: PlanId) {
+  let result: PublicUser | null = null;
   await updateDb((db) => {
     const user = db.users.find((u) => u.id === userId);
-    if (user) user.plan = plan;
+    if (!user) return;
+    user.plan = plan;
+    result = toPublicUser(user);
   });
-  const user = await findUserById(userId);
-  return user ? toPublicUser(user) : null;
+  return result;
 }
 
 export async function setUserStripeBilling(
@@ -849,10 +852,17 @@ export async function createBoard(input: {
   name: string;
   description?: string;
   userId: string;
-  template?: "delivery" | "support" | "content";
+  /** blank = one starter list; user adds/removes lists themselves */
+  template?: "blank" | "delivery" | "support" | "content";
 }) {
-  const template = input.template ?? "delivery";
+  const template = input.template ?? "blank";
   const presets = {
+    blank: {
+      lists: [
+        { title: "To do", wip: null as number | null, accent: "#22d3ee" },
+      ],
+      automations: false,
+    },
     delivery: {
       lists: [
         { title: "Backlog", wip: null, accent: "#a78bfa" },
@@ -924,6 +934,7 @@ export async function createBoard(input: {
     title: item.title,
     position: index,
     wipLimit: item.wip,
+    defaultPriority: "medium",
     accent: item.accent,
   }));
 
@@ -946,7 +957,9 @@ export async function createBoard(input: {
     ).length;
     if (existingCount >= limits.boards) {
       throw new Error(
-        `Free plan allows ${limits.boards} boards. Upgrade to Pro for unlimited boards.`,
+        plan === "pro"
+          ? `Pro plan allows ${limits.boards} boards.`
+          : `Free plan allows ${limits.boards} boards. Upgrade to Pro for up to 20.`,
       );
     }
 
@@ -957,7 +970,7 @@ export async function createBoard(input: {
     );
     const review = defaultLists.find((l) => /review|edit|waiting/i.test(l.title));
     const pro = plan === "pro";
-    if (inProgress) {
+    if (preset.automations && inProgress) {
       db.automations.push({
         id: uid("auto"),
         boardId: board.id,
@@ -977,7 +990,7 @@ export async function createBoard(input: {
         createdAt: new Date().toISOString(),
       });
     }
-    if (review) {
+    if (preset.automations && review) {
       db.automations.push({
         id: uid("auto"),
         boardId: board.id,
@@ -1000,12 +1013,38 @@ export async function createBoard(input: {
       id: uid("act"),
       boardId: board.id,
       userId: input.userId,
-      message: `created board "${board.name}" from ${template} template`,
+      message:
+        template === "blank"
+          ? `created board "${board.name}"`
+          : `created board "${board.name}" from ${template} template`,
       createdAt: new Date().toISOString(),
     });
   });
 
   return board;
+}
+
+export async function deleteBoard(boardId: string, userId: string) {
+  await updateDb((db) => {
+    const board = db.boards.find((b) => b.id === boardId);
+    if (!board) throw new Error("Not found");
+    const ws = db.workspaces.find((w) => w.id === board.workspaceId);
+    const allowed =
+      board.memberIds.includes(userId) ||
+      Boolean(ws?.memberIds.includes(userId)) ||
+      ws?.ownerId === userId;
+    if (!allowed) throw new Error("Forbidden");
+
+    db.automations = db.automations.filter((a) => a.boardId !== boardId);
+    db.activities = db.activities.filter((a) => a.boardId !== boardId);
+    db.cards = db.cards.filter((c) => c.boardId !== boardId);
+    db.lists = db.lists.filter((l) => l.boardId !== boardId);
+    db.boards = db.boards.filter((b) => b.id !== boardId);
+    db.notifications = db.notifications.filter(
+      (n) => !n.href?.includes(`/board/${boardId}`),
+    );
+  });
+  return { ok: true as const };
 }
 
 export async function createList(boardId: string, title: string, userId: string) {
@@ -1018,6 +1057,7 @@ export async function createList(boardId: string, title: string, userId: string)
     title,
     position,
     wipLimit: null,
+    defaultPriority: "medium",
     accent: LIST_ACCENTS[position % LIST_ACCENTS.length],
   };
   await updateDb((d) => {
@@ -1033,9 +1073,43 @@ export async function createList(boardId: string, title: string, userId: string)
   return list;
 }
 
+export async function deleteList(listId: string, userId: string) {
+  await updateDb((db) => {
+    const list = db.lists.find((l) => l.id === listId);
+    if (!list) throw new Error("Not found");
+    const board = db.boards.find((b) => b.id === list.boardId);
+    const ws = board
+      ? db.workspaces.find((w) => w.id === board.workspaceId)
+      : null;
+    const allowed =
+      board &&
+      (board.memberIds.includes(userId) ||
+        Boolean(ws?.memberIds.includes(userId)));
+    if (!allowed) throw new Error("Forbidden");
+
+    const boardId = list.boardId;
+    db.cards = db.cards.filter((c) => c.listId !== listId);
+    db.lists = db.lists.filter((l) => l.id !== listId);
+    db.lists
+      .filter((l) => l.boardId === boardId)
+      .sort((a, b) => a.position - b.position)
+      .forEach((l, i) => {
+        l.position = i;
+      });
+    db.activities.push({
+      id: uid("act"),
+      boardId,
+      userId,
+      message: `deleted list "${list.title}"`,
+      createdAt: new Date().toISOString(),
+    });
+  });
+  return { ok: true as const };
+}
+
 export async function updateList(
   listId: string,
-  patch: Partial<Pick<List, "title" | "wipLimit" | "accent">>,
+  patch: Partial<Pick<List, "title" | "wipLimit" | "defaultPriority" | "accent">>,
   userId: string,
 ) {
   let updated: List | null = null;
@@ -1051,8 +1125,30 @@ export async function updateList(
       (board.memberIds.includes(userId) ||
         Boolean(ws?.memberIds.includes(userId)));
     if (!allowed) throw new Error("Forbidden");
+    const prevTitle = list.title;
+    const prevPriority = list.defaultPriority;
     Object.assign(list, patch);
     updated = list;
+    let message: string | null = null;
+    if (patch.title != null && patch.title !== prevTitle) {
+      message = `renamed list to "${patch.title}"`;
+    } else if (
+      patch.defaultPriority != null &&
+      patch.defaultPriority !== prevPriority
+    ) {
+      message = `changed default priority on "${list.title}"`;
+    } else if (patch.accent != null || patch.wipLimit !== undefined) {
+      message = `updated list "${list.title}"`;
+    }
+    if (message) {
+      db.activities.unshift({
+        id: uid("act"),
+        boardId: list.boardId,
+        userId,
+        message,
+        createdAt: new Date().toISOString(),
+      });
+    }
   });
   return updated;
 }
@@ -1085,7 +1181,7 @@ export async function createCard(input: {
     labelIds: [],
     assigneeIds: [input.userId],
     dueDate: null,
-    priority: "medium",
+    priority: list?.defaultPriority ?? "medium",
     estimateHours: 0,
     loggedHours: 0,
     checklist: [],
@@ -1210,37 +1306,43 @@ export async function updateCard(
   return updated;
 }
 
+export async function deleteCard(cardId: string, userId: string) {
+  await updateDb((db) => {
+    const card = db.cards.find((c) => c.id === cardId);
+    if (!card) throw new Error("Not found");
+    if (!boardAllowsUser(db, card.boardId, userId)) throw new Error("Forbidden");
+    const boardId = card.boardId;
+    const listId = card.listId;
+    const title = card.title;
+    db.cards = db.cards.filter((c) => c.id !== cardId);
+    db.cards
+      .filter((c) => c.listId === listId)
+      .sort((a, b) => a.position - b.position)
+      .forEach((c, i) => {
+        c.position = i;
+      });
+    db.activities.unshift({
+      id: uid("act"),
+      boardId,
+      userId,
+      message: `deleted card "${title}"`,
+      createdAt: new Date().toISOString(),
+    });
+  });
+  return { ok: true as const };
+}
+
 export async function completeCard(cardId: string, userId: string) {
   let updated: Card | null = null;
   await updateDb((db) => {
     const card = db.cards.find((c) => c.id === cardId);
     if (!card) return;
     if (!boardAllowsUser(db, card.boardId, userId)) throw new Error("Forbidden");
-    const doneList = findDoneList(db, card.boardId);
-    if (!doneList) throw new Error("No Done list on this board");
 
-    const fromList = card.listId;
+    // Stay in the current list — checkbox only marks done, no auto-move.
     const now = new Date().toISOString();
     card.completedAt = now;
     card.updatedAt = now;
-
-    if (fromList !== doneList.id) {
-      card.listId = doneList.id;
-      card.enteredListAt = now;
-      const siblings = db.cards
-        .filter((c) => c.listId === doneList.id && c.id !== card.id)
-        .sort((a, b) => a.position - b.position);
-      siblings.push(card);
-      siblings.forEach((c, i) => {
-        c.position = i;
-      });
-      db.cards
-        .filter((c) => c.listId === fromList)
-        .sort((a, b) => a.position - b.position)
-        .forEach((c, i) => {
-          c.position = i;
-        });
-    }
 
     db.activities.unshift({
       id: uid("act"),
@@ -1250,16 +1352,6 @@ export async function completeCard(cardId: string, userId: string) {
       createdAt: now,
     });
 
-    if (fromList !== doneList.id) {
-      runAutomations(db, {
-        boardId: card.boardId,
-        card,
-        userId,
-        trigger: "card_moved",
-        fromListId: fromList,
-        toListId: doneList.id,
-      });
-    }
     updated = card;
   });
   return updated;
@@ -1273,39 +1365,11 @@ export async function uncompleteCard(cardId: string, userId: string) {
     if (!boardAllowsUser(db, card.boardId, userId)) {
       throw new Error("Forbidden");
     }
-    const boardLists = db.lists
-      .filter((l) => l.boardId === card.boardId)
-      .sort((a, b) => a.position - b.position);
-    const doneList = findDoneList(db, card.boardId);
-    const target =
-      boardLists.find(
-        (l) => l.id !== doneList?.id && /progress|ready|working|triaged/i.test(l.title),
-      ) ||
-      boardLists.find((l) => l.id !== doneList?.id) ||
-      null;
-    if (!target) return;
 
-    const fromList = card.listId;
+    // Stay in place — only clear completed flag.
     const now = new Date().toISOString();
     card.completedAt = null;
     card.updatedAt = now;
-    if (fromList !== target.id) {
-      card.listId = target.id;
-      card.enteredListAt = now;
-      const siblings = db.cards
-        .filter((c) => c.listId === target.id && c.id !== card.id)
-        .sort((a, b) => a.position - b.position);
-      siblings.unshift(card);
-      siblings.forEach((c, i) => {
-        c.position = i;
-      });
-      db.cards
-        .filter((c) => c.listId === fromList)
-        .sort((a, b) => a.position - b.position)
-        .forEach((c, i) => {
-          c.position = i;
-        });
-    }
     db.activities.unshift({
       id: uid("act"),
       boardId: card.boardId,
@@ -1824,6 +1888,7 @@ async function buildSeed(): Promise<Database> {
     title: item.title,
     position,
     wipLimit: item.wip,
+    defaultPriority: "medium",
     accent: item.accent,
   }));
 

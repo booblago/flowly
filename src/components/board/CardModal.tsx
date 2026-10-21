@@ -2,19 +2,39 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
-import type { Board, Card, ChecklistItem, Priority, PublicUser } from "@/lib/types";
-import { PRIORITY_STYLES, cn, daysInList, initials, uid } from "@/lib/utils";
+import type { Board, Card, ChecklistItem, List, Priority, PublicUser } from "@/lib/types";
+import {
+  PRIORITIES,
+  PRIORITY_CODES,
+  PRIORITY_COLORS,
+  cn,
+  daysInList,
+  initials,
+  uid,
+} from "@/lib/utils";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 type Props = {
   card: Card;
   board: Board;
   members: PublicUser[];
+  lists?: List[];
   onClose: () => void;
   onSave: (card: Card) => Promise<void>;
+  onDelete?: () => void;
+  onMove?: (listId: string) => void;
 };
 
-export function CardModal({ card, board, members, onClose, onSave }: Props) {
+export function CardModal({
+  card,
+  board,
+  members,
+  lists = [],
+  onClose,
+  onSave,
+  onDelete,
+  onMove,
+}: Props) {
   const t = useT();
   const [draft, setDraft] = useState(card);
   const [comment, setComment] = useState("");
@@ -107,12 +127,24 @@ export function CardModal({ card, board, members, onClose, onSave }: Props) {
               {saving ? ` · ${t("saving")}` : ""}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-full p-2 text-muted hover:bg-paper"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="rounded-full border border-rose/30 px-3 py-1.5 text-xs font-semibold text-rose hover:bg-rose/10"
+              >
+                {t("deleteCard")}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full p-2 text-muted hover:bg-paper"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-6 p-5 md:grid-cols-[1.4fr_0.8fr]">
@@ -266,26 +298,34 @@ export function CardModal({ card, board, members, onClose, onSave }: Props) {
 
           <aside className="space-y-4">
             <Field label={t("priority")}>
-              <select
-                value={draft.priority}
-                onChange={(e) => {
-                  const next = {
-                    ...draft,
-                    priority: e.target.value as Priority,
-                  };
-                  setDraft(next);
-                  void save(next);
-                }}
-                className={cn(
-                  "w-full rounded-xl px-3 py-2 text-sm font-semibold",
-                  PRIORITY_STYLES[draft.priority],
-                )}
-              >
-                <option value="low">{t("low")}</option>
-                <option value="medium">{t("medium")}</option>
-                <option value="high">{t("high")}</option>
-                <option value="urgent">{t("urgent")}</option>
-              </select>
+              <div className="flex flex-wrap items-center gap-2">
+                {PRIORITIES.map((p) => {
+                  const active = draft.priority === p;
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      title={t(p)}
+                      aria-label={t(p)}
+                      aria-pressed={active}
+                      onClick={() => {
+                        const next = { ...draft, priority: p };
+                        setDraft(next);
+                        void save(next);
+                      }}
+                      className={cn(
+                        "rounded-lg px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide transition",
+                        active
+                          ? "opacity-100"
+                          : "opacity-40 hover:opacity-80",
+                      )}
+                      style={{ color: PRIORITY_COLORS[p] }}
+                    >
+                      {PRIORITY_CODES[p]}
+                    </button>
+                  );
+                })}
+              </div>
             </Field>
 
             <Field label={t("dueDate")}>

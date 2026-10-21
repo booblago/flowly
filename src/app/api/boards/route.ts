@@ -27,7 +27,7 @@ const createSchema = z.object({
   workspaceId: z.string().optional(),
   name: z.string().min(1),
   description: z.string().optional(),
-  template: z.enum(["delivery", "support", "content"]).optional(),
+  template: z.enum(["blank", "delivery", "support", "content"]).optional(),
 });
 
 export async function POST(req: Request) {
