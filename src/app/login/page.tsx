@@ -131,7 +131,14 @@ function LoginForm() {
 
         <p className="mt-4 text-center text-sm text-muted">
           {t("noAccount")}{" "}
-          <Link href="/register" className="font-semibold text-accent">
+          <Link
+            href={
+              params.get("callbackUrl")
+                ? `/register?callbackUrl=${encodeURIComponent(params.get("callbackUrl")!)}`
+                : "/register"
+            }
+            className="font-semibold text-accent"
+          >
             {t("register")}
           </Link>
         </p>

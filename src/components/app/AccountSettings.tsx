@@ -50,6 +50,8 @@ export function AccountSettings() {
     const params = new URLSearchParams(window.location.search);
     const billing = params.get("billing");
     const sessionId = params.get("session_id");
+    const upgrade = params.get("upgrade");
+
     if (billing === "cancel") {
       setMessage(t("billingCanceled"));
       window.history.replaceState({}, "", "/account");
@@ -67,6 +69,22 @@ export function AccountSettings() {
           setMessage(t("billingSuccess"));
         }
         window.history.replaceState({}, "", "/account");
+      })();
+      return;
+    }
+
+    // Landing / Start Pro → resume checkout after login
+    if (upgrade === "1") {
+      window.history.replaceState({}, "", "/account");
+      setPlanOpen(true);
+      void (async () => {
+        setBillingBusy(true);
+        setError("");
+        const result = await startProCheckout();
+        setBillingBusy(false);
+        if (result.error) {
+          setError(result.error);
+        }
       })();
     }
   }, [t]);

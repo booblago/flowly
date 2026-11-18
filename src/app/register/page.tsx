@@ -1,15 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { LanguageSwitcher } from "@/components/app/LanguageSwitcher";
+import { safeCallbackUrl } from "@/lib/access";
 import { useT } from "@/lib/i18n/LanguageContext";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const t = useT();
   const router = useRouter();
+  const params = useSearchParams();
+  const rawCallback = params.get("callbackUrl");
+  const afterLogin = safeCallbackUrl(rawCallback, "/dashboard");
+  const loginHref = rawCallback
+    ? `/login?callbackUrl=${encodeURIComponent(afterLogin)}`
+    : "/login";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -51,6 +58,9 @@ export default function RegisterPage() {
     setNeedsVerification(Boolean(data.needsVerification));
     setEmailSent(Boolean(data.emailSent));
     setVerifyUrl(data.verifyUrl || null);
+    if (!data.needsVerification) {
+      router.push(loginHref);
+    }
   }
 
   if (done) {
@@ -80,7 +90,7 @@ export default function RegisterPage() {
             </a>
           )}
           <Link
-            href="/login"
+            href={loginHref}
             className={`mt-4 block text-center text-sm font-semibold ${
               needsVerification
                 ? "text-brand hover:underline"
@@ -161,11 +171,19 @@ export default function RegisterPage() {
         </button>
         <p className="mt-4 text-center text-sm text-muted">
           {t("haveAccount")}{" "}
-          <Link href="/login" className="text-brand hover:underline">
+          <Link href={loginHref} className="text-brand hover:underline">
             {t("login")}
           </Link>
         </p>
       </form>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
   );
 }

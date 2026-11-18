@@ -30,6 +30,10 @@ export function LandingPage() {
   const t = useT();
   const { data: session, status } = useSession();
   const signedIn = status === "authenticated" && Boolean(session?.user);
+  const proHref = signedIn
+    ? "/account?upgrade=1"
+    : `/login?callbackUrl=${encodeURIComponent("/account?upgrade=1")}`;
+  const freeHref = signedIn ? "/dashboard" : "/register";
 
   const features: {
     icon: typeof Workflow;
@@ -570,7 +574,7 @@ export function LandingPage() {
                   ))}
                 </ul>
                 <Link
-                  href="/register"
+                  href={freeHref}
                   className="mt-8 inline-flex rounded-full border border-[var(--line)] px-5 py-2.5 text-sm font-semibold hover:border-brand/40"
                 >
                   {t("startFree")}
@@ -605,7 +609,7 @@ export function LandingPage() {
                   ))}
                 </ul>
                 <Link
-                  href="/register"
+                  href={proHref}
                   className="cta-primary mt-8 inline-flex rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-black"
                 >
                   {t("startPro")}
@@ -635,7 +639,7 @@ export function LandingPage() {
               <div className="relative mt-8 flex flex-wrap items-center gap-3">
                 <DemoBoardButton variant="primary" labelKey="openDemo" />
                 <Link
-                  href="/register"
+                  href={freeHref}
                   className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200"
                 >
                   {t("startFree")}
