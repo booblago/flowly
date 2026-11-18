@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { LanguageSwitcher } from "@/components/app/LanguageSwitcher";
 import { useT } from "@/lib/i18n/LanguageContext";
 
 export default function RegisterPage() {
   const t = useT();
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,6 +19,14 @@ export default function RegisterPage() {
   const [needsVerification, setNeedsVerification] = useState(false);
   const [verifyUrl, setVerifyUrl] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
+
+  function goBack() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push("/");
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -89,6 +100,14 @@ export default function RegisterPage() {
         onSubmit={onSubmit}
         className="glass w-full max-w-md rounded-[28px] p-8"
       >
+        <button
+          type="button"
+          onClick={goBack}
+          className="mb-4 inline-flex min-h-10 items-center gap-1.5 rounded-full border border-[var(--line)] px-3 py-2 text-sm font-medium text-muted hover:text-ink md:hidden"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {t("goBack")}
+        </button>
         <div className="flex items-center justify-between">
           <Link href="/" className="font-display text-2xl font-extrabold">
             <span className="neon-cyan">Flow</span>

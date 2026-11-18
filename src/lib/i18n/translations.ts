@@ -491,6 +491,7 @@ export const messages = {
       "On iPhone: open this site in Safari, tap Share, then Add to Home Screen.",
     installIosShare: "Safari → Share → Add to Home Screen",
     mobileAppBadge: "Mobile app (PWA)",
+    goBack: "Back",
   },
   uk: {
     brand: "Flowly",
@@ -974,6 +975,7 @@ export const messages = {
       "На iPhone: відкрийте сайт у Safari → Поділитися → На екран «Додому».",
     installIosShare: "Safari → Поділитися → На екран «Додому»",
     mobileAppBadge: "Мобільний додаток (PWA)",
+    goBack: "Назад",
   },
   de: {
     brand: "Flowly",
@@ -1457,6 +1459,7 @@ export const messages = {
       "Am iPhone: Safari öffnen → Teilen → Zum Home-Bildschirm.",
     installIosShare: "Safari → Teilen → Zum Home-Bildschirm",
     mobileAppBadge: "Mobile App (PWA)",
+    goBack: "Zurück",
   },
   fr: {
     brand: "Flowly",
@@ -1941,6 +1944,7 @@ export const messages = {
       "Sur iPhone : ouvrez Safari → Partager → Sur l’écran d’accueil.",
     installIosShare: "Safari → Partager → Sur l’écran d’accueil",
     mobileAppBadge: "App mobile (PWA)",
+    goBack: "Retour",
   },
 } as const;
 
