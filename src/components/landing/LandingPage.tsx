@@ -248,7 +248,7 @@ export function LandingPage() {
               {signedIn ? t("signedInHint") : t("demoBoardHint")}
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              <span className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-accent">
+              <span className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-accent md:hidden">
                 {t("mobileAppBadge")}
               </span>
               {trustChips.map((key) => (
@@ -260,7 +260,7 @@ export function LandingPage() {
                 </span>
               ))}
             </div>
-            <div className="mt-5 max-w-md">
+            <div className="mt-5 max-w-md md:hidden">
               <InstallHint />
             </div>
           </div>

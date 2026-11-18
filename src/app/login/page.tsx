@@ -108,7 +108,7 @@ function LoginForm() {
           />
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 md:hidden">
           <InstallHint compact />
         </div>
 

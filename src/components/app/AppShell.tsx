@@ -102,12 +102,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className={`flex min-h-dvh flex-col bg-paper text-ink ${compact ? "density-compact" : ""}`}
+      className={`flex min-h-screen flex-col bg-paper text-ink max-md:min-h-dvh ${compact ? "density-compact" : ""}`}
     >
-      <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-black/80 pt-[env(safe-area-inset-top)] backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
-          <div className="flex min-w-0 items-center gap-6">
-            <Link href="/" className="font-display shrink-0 text-xl font-extrabold">
+      <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-black/80 backdrop-blur max-md:pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-4 px-4 sm:px-6 max-md:h-14 max-md:gap-3">
+          <div className="flex items-center gap-8 max-md:min-w-0 max-md:gap-6">
+            <Link href="/" className="font-display text-xl font-extrabold max-md:shrink-0">
               <span className="neon-cyan">Flow</span>
               <span className="neon-pink">ly</span>
             </Link>
@@ -147,7 +147,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 setMobileNav(false);
                 if (!open) void markRead();
               }}
-              className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] text-muted hover:text-ink"
+              className="relative rounded-full border border-[var(--line)] p-2 text-muted hover:text-ink max-md:flex max-md:h-10 max-md:w-10 max-md:items-center max-md:justify-center max-md:p-0"
               aria-label="Notifications"
             >
               <Bell className="h-4 w-4" />
@@ -178,12 +178,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             )}
-            <div className="hidden sm:block">
+            <div className="max-md:hidden">
               <UserMenu />
             </div>
             <button
               type="button"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] text-muted hover:text-ink md:hidden"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] p-2 text-muted hover:text-ink md:hidden"
               aria-label={mobileNav ? t("close") : "Menu"}
               aria-expanded={mobileNav}
               onClick={() => {
@@ -231,7 +231,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
       </header>
 
-      <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-5 pb-[calc(5.25rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6 md:pb-6">
+      <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6 max-md:pb-[calc(5.25rem+env(safe-area-inset-bottom))]">
         {children}
       </main>
 
