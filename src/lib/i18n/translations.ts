@@ -483,6 +483,14 @@ export const messages = {
     adminThisIsYou: "you",
     adminCannotDeleteSelf: "You can’t delete your own account.",
     adminCannotDemoteSelf: "You can’t change your own plan here.",
+    installTitle: "Install Flowly on your phone",
+    installCta: "Install app",
+    installAndroidHint:
+      "Add Flowly to your home screen for a full-screen mobile app experience — same account, boards, and Stripe billing.",
+    installIosHint:
+      "On iPhone: open this site in Safari, tap Share, then Add to Home Screen.",
+    installIosShare: "Safari → Share → Add to Home Screen",
+    mobileAppBadge: "Mobile app (PWA)",
   },
   uk: {
     brand: "Flowly",
@@ -958,6 +966,14 @@ export const messages = {
     adminThisIsYou: "ти",
     adminCannotDeleteSelf: "Свій акаунт видалити не можна.",
     adminCannotDemoteSelf: "Свій план тут змінити не можна.",
+    installTitle: "Встановити Flowly на телефон",
+    installCta: "Встановити",
+    installAndroidHint:
+      "Додайте Flowly на головний екран — повноекранний мобільний додаток з тими ж акаунтами, дошками та Stripe.",
+    installIosHint:
+      "На iPhone: відкрийте сайт у Safari → Поділитися → На екран «Додому».",
+    installIosShare: "Safari → Поділитися → На екран «Додому»",
+    mobileAppBadge: "Мобільний додаток (PWA)",
   },
   de: {
     brand: "Flowly",
@@ -1433,6 +1449,14 @@ export const messages = {
     adminThisIsYou: "du",
     adminCannotDeleteSelf: "Eigenes Konto kann nicht gelöscht werden.",
     adminCannotDemoteSelf: "Eigenen Plan hier nicht ändern.",
+    installTitle: "Flowly auf dem Handy installieren",
+    installCta: "App installieren",
+    installAndroidHint:
+      "Flowly zum Startbildschirm hinzufügen — Vollbild-App mit denselben Accounts, Boards und Stripe-Billing.",
+    installIosHint:
+      "Am iPhone: Safari öffnen → Teilen → Zum Home-Bildschirm.",
+    installIosShare: "Safari → Teilen → Zum Home-Bildschirm",
+    mobileAppBadge: "Mobile App (PWA)",
   },
   fr: {
     brand: "Flowly",
@@ -1909,6 +1933,14 @@ export const messages = {
     adminThisIsYou: "vous",
     adminCannotDeleteSelf: "Vous ne pouvez pas supprimer votre compte.",
     adminCannotDemoteSelf: "Vous ne pouvez pas changer votre plan ici.",
+    installTitle: "Installer Flowly sur le téléphone",
+    installCta: "Installer l’app",
+    installAndroidHint:
+      "Ajoutez Flowly à l’écran d’accueil — app plein écran avec les mêmes comptes, boards et paiement Stripe.",
+    installIosHint:
+      "Sur iPhone : ouvrez Safari → Partager → Sur l’écran d’accueil.",
+    installIosShare: "Safari → Partager → Sur l’écran d’accueil",
+    mobileAppBadge: "App mobile (PWA)",
   },
 } as const;
 

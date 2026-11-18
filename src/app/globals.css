@@ -611,3 +611,25 @@ h3 {
     -1px 1px 0 #000,
     1px 1px 0 #000 !important;
 }
+
+/* PWA / mobile shell */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-pb {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+/* Prefer larger tap targets on coarse pointers */
+@media (pointer: coarse) {
+  button,
+  a,
+  [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+  }
+}

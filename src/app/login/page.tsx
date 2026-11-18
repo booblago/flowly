@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
 import { DemoBoardButton } from "@/components/app/DemoBoardButton";
 import { LanguageSwitcher } from "@/components/app/LanguageSwitcher";
+import { InstallHint } from "@/components/pwa/InstallHint";
 import { safeCallbackUrl } from "@/lib/access";
 import { useT } from "@/lib/i18n/LanguageContext";
 
@@ -105,6 +106,10 @@ function LoginForm() {
             labelKey="demoBoard"
             className="mt-3 w-full py-2.5"
           />
+        </div>
+
+        <div className="mt-4">
+          <InstallHint compact />
         </div>
 
         <p className="mt-4 text-center text-sm text-muted">

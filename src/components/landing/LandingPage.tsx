@@ -22,6 +22,7 @@ import {
 import { DemoBoardButton } from "@/components/app/DemoBoardButton";
 import { LanguageSwitcher } from "@/components/app/LanguageSwitcher";
 import { UserMenu } from "@/components/app/UserMenu";
+import { InstallHint } from "@/components/pwa/InstallHint";
 import { useT } from "@/lib/i18n/LanguageContext";
 import type { MessageKey } from "@/lib/i18n/translations";
 
@@ -247,6 +248,9 @@ export function LandingPage() {
               {signedIn ? t("signedInHint") : t("demoBoardHint")}
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
+              <span className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-accent">
+                {t("mobileAppBadge")}
+              </span>
               {trustChips.map((key) => (
                 <span
                   key={key}
@@ -255,6 +259,9 @@ export function LandingPage() {
                   {t(key)}
                 </span>
               ))}
+            </div>
+            <div className="mt-5 max-w-md">
+              <InstallHint />
             </div>
           </div>
 

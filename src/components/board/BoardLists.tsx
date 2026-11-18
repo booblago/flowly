@@ -430,18 +430,18 @@ function SortableCard({
             onToggleComplete();
           }}
           className={cn(
-            "relative z-10 mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition",
+            "relative z-10 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition sm:mt-1 sm:h-4 sm:w-4 sm:rounded",
             checked
               ? "border-brand bg-brand text-black"
               : "border-zinc-400 bg-transparent text-transparent hover:border-white hover:text-white/40",
             busy && "opacity-60",
           )}
         >
-          <Check className="h-2.5 w-2.5" strokeWidth={3} />
+          <Check className="h-3 w-3 sm:h-2.5 sm:w-2.5" strokeWidth={3} />
         </button>
 
         <div
-          className="min-w-0 flex-1 cursor-grab touch-none text-left active:cursor-grabbing"
+          className="min-w-0 flex-1 cursor-grab touch-manipulation text-left active:cursor-grabbing sm:touch-none"
           title={`${t("priority")}: ${t(card.priority)}`}
           onDoubleClick={onOpen}
           {...attributes}

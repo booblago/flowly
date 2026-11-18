@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Menu,
   Rows3,
+  UserRound,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -27,6 +28,38 @@ const links: { href: string; label: MessageKey; icon: typeof Inbox }[] = [
   { href: "/completed", label: "completedTasks", icon: CheckCircle2 },
   { href: "/analytics", label: "analytics", icon: BarChart3 },
   { href: "/support", label: "support", icon: Headphones },
+];
+
+const bottomTabs: {
+  href: string;
+  label: MessageKey;
+  icon: typeof Inbox;
+  match: (pathname: string) => boolean;
+}[] = [
+  {
+    href: "/dashboard",
+    label: "boards",
+    icon: LayoutDashboard,
+    match: (p) => p.startsWith("/dashboard") || p.startsWith("/board"),
+  },
+  {
+    href: "/inbox",
+    label: "inbox",
+    icon: Inbox,
+    match: (p) => p.startsWith("/inbox"),
+  },
+  {
+    href: "/analytics",
+    label: "analytics",
+    icon: BarChart3,
+    match: (p) => p.startsWith("/analytics"),
+  },
+  {
+    href: "/account",
+    label: "account",
+    icon: UserRound,
+    match: (p) => p.startsWith("/account"),
+  },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -69,12 +102,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className={`flex min-h-screen flex-col bg-paper text-ink ${compact ? "density-compact" : ""}`}
+      className={`flex min-h-dvh flex-col bg-paper text-ink ${compact ? "density-compact" : ""}`}
     >
-      <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-black/80 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between gap-4 px-4 sm:px-6">
-          <div className="flex items-center gap-8">
-            <Link href="/" className="font-display text-xl font-extrabold">
+      <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-black/80 pt-[env(safe-area-inset-top)] backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
+          <div className="flex min-w-0 items-center gap-6">
+            <Link href="/" className="font-display shrink-0 text-xl font-extrabold">
               <span className="neon-cyan">Flow</span>
               <span className="neon-pink">ly</span>
             </Link>
@@ -114,7 +147,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 setMobileNav(false);
                 if (!open) void markRead();
               }}
-              className="relative rounded-full border border-[var(--line)] p-2 text-muted hover:text-ink"
+              className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] text-muted hover:text-ink"
               aria-label="Notifications"
             >
               <Bell className="h-4 w-4" />
@@ -145,10 +178,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             )}
-            <UserMenu />
+            <div className="hidden sm:block">
+              <UserMenu />
+            </div>
             <button
               type="button"
-              className="rounded-full border border-[var(--line)] p-2 text-muted hover:text-ink md:hidden"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--line)] text-muted hover:text-ink md:hidden"
               aria-label={mobileNav ? t("close") : "Menu"}
               aria-expanded={mobileNav}
               onClick={() => {
@@ -169,7 +204,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium ${
+                    className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium ${
                       active
                         ? "bg-brand/15 text-brand"
                         : "text-muted hover:bg-surface hover:text-ink"
@@ -180,14 +215,52 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </Link>
                 );
               })}
+              <Link
+                href="/account"
+                className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium ${
+                  pathname.startsWith("/account")
+                    ? "bg-brand/15 text-brand"
+                    : "text-muted hover:bg-surface hover:text-ink"
+                }`}
+              >
+                <UserRound className="h-4 w-4" />
+                {t("account")}
+              </Link>
             </div>
           </nav>
         )}
       </header>
-      <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6">
+
+      <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-5 pb-[calc(5.25rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-6 md:pb-6">
         {children}
       </main>
-      <AppFooter />
+
+      <div className="hidden md:block">
+        <AppFooter />
+      </div>
+
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-black/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        aria-label="Mobile"
+      >
+        <div className="mx-auto grid max-w-lg grid-cols-4 px-1 pt-1">
+          {bottomTabs.map((tab) => {
+            const active = tab.match(pathname);
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] font-semibold tracking-wide ${
+                  active ? "text-brand" : "text-muted"
+                }`}
+              >
+                <tab.icon className={`h-5 w-5 ${active ? "text-brand" : ""}`} />
+                <span>{t(tab.label)}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

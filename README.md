@@ -95,11 +95,24 @@ Use Stripe test cards (e.g. `4242 4242 4242 4242`).
 - `npm run db:studio` — open Drizzle Studio (local SQLite)
 - `npm run db:reset` — wipe local SQLite + reseed on next boot
 
+## Mobile app (PWA)
+
+Flowly ships as an installable **Progressive Web App** on the same live URL — full-screen on phone, home-screen icon, bottom navigation.
+
+### Install on a phone
+
+1. Open [https://flowly-bice.vercel.app](https://flowly-bice.vercel.app) on the device.
+2. **Android (Chrome):** menu → **Install app** / **Add to Home screen**.
+3. **iPhone (Safari):** Share → **Add to Home Screen**.
+4. Open the Flowly icon — it runs standalone (no browser chrome).
+
+Demo the same flows as desktop: Demo board → drag cards → Inbox → Analytics. Auth, Redis DB, and Stripe billing are shared with the web app.
+
 ## Product walkthrough
 
 Suggested path on the live demo:
 
-1. Landing → one-click **Demo board**
+1. Landing → one-click **Demo board** (or install PWA first)
 2. Drag cards, set priority, open a card (checklist / comments)
 3. **Smart Inbox** → **Analytics** → **Automations**
 4. (Optional) Register → Account → Stripe test checkout for Pro
